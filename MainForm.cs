@@ -49,7 +49,151 @@ namespace ScannedCardDenoiser
             if (!string.IsNullOrEmpty(Properties.Settings.Default.TargetPath))
                 TB_Target.Text = Properties.Settings.Default.TargetPath;
 
+            // 이전 실행에서 저장한 보정 옵션 복원
+            LoadSettings();
+
+            // 창을 닫을 때(실행하지 않더라도) 현재 설정을 저장
+            this.FormClosing += (s, args) => SaveSettings();
+
             UpdateTBResize();
+        }
+
+        // 현재 폼의 모든 보정 옵션을 한 문자열로 직렬화해 사용자 설정에 저장한다.
+        private void SaveSettings()
+        {
+            var lines = new List<string>
+            {
+                // Image Area Adjustment
+                "AdjMode=" + (RB_AutoAdjust.Checked ? "Auto" : RB_ManualAdjust.Checked ? "Manual" : "None"),
+                "AdjThreshold=" + TB_AdjThreshold.Text,
+                // Brightness
+                "Brightness=" + TB_Brightness.Value,
+                // Denoise
+                "DenoiseColor=" + CB_DenoiseColor.Checked,
+                "DenoiseH=" + TB_DenoiseH.Text,
+                "DenoiseHColor=" + TB_DenoiseHColor.Text,
+                "DenoiseTSize=" + TB_DenoiseTSize.Text,
+                "DenoiseSSize=" + TB_DenoiseSSize.Text,
+                // AutoLevel
+                "AutoLevel=" + CB_AutoLevel.Checked,
+                "AutoLevelMin=" + TB_AutoLevelMin.Text,
+                "AutoLevelMax=" + TB_AutoLevelMax.Text,
+                // Sharpen
+                "Sharpen=" + CB_Sharpen.Checked,
+                "SharpenAmount=" + TB_Sharpen.Value,
+                // 사이즈 변경(ChangeSize/ResizeMode/W/H/Percent)은 의도적으로 저장하지 않음
+                // Clip
+                "Clip=" + CB_Clip.Checked,
+                "ClipTop=" + TB_ClipTop.Text,
+                "ClipBottom=" + TB_ClipBottom.Text,
+                "ClipLeft=" + TB_ClipLeft.Text,
+                "ClipRight=" + TB_ClipRight.Text,
+                // Corner / Edge
+                "CornerRounding=" + CB_CornerRounding.Checked,
+                "CornerRadius=" + TB_CornerRounding.Text,
+                "EdgeLine=" + CB_EdgeLine.Checked,
+                // waifu2x
+                "Waifu2x=" + CB_waifu2x.Checked,
+                "Waifu2xTTA=" + CB_Waifu2xTTA.Checked,
+                "WaifuModel=" + (RB_WaifuCunet.Checked ? "Cunet" : RB_WaifuAnime.Checked ? "Anime" : "Photo"),
+                "WaifuLevel=" + (RB_WaifuLow.Checked ? "Low" : RB_WaifuMed.Checked ? "Med" : RB_WaifuHigh.Checked ? "High" : "Highest"),
+                // misc
+                "SubFolder=" + CB_SubFolder.Checked,
+                "Overwrite=" + CB_Overwrite.Checked,
+            };
+
+            Properties.Settings.Default.Preferences = string.Join("\n", lines);
+            Properties.Settings.Default.SourcePath = TB_Source.Text;
+            Properties.Settings.Default.TargetPath = TB_Target.Text;
+            Properties.Settings.Default.Save();
+        }
+
+        // 저장된 보정 옵션 문자열을 파싱해 폼 컨트롤에 적용한다.
+        private void LoadSettings()
+        {
+            string pref = Properties.Settings.Default.Preferences;
+            if (string.IsNullOrEmpty(pref))
+                return;
+
+            var map = new Dictionary<string, string>();
+            foreach (var line in pref.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = line.IndexOf('=');
+                if (eq <= 0)
+                    continue;
+                map[line.Substring(0, eq)] = line.Substring(eq + 1);
+            }
+
+            // 체크박스/텍스트박스/트랙바를 안전하게 복원하는 보조 함수들
+            Action<string, CheckBox> setBool = (k, cb) =>
+            {
+                if (map.TryGetValue(k, out string v) && bool.TryParse(v, out bool b)) cb.Checked = b;
+            };
+            // 숫자 텍스트박스: 빈 값은 무시(Convert.ToInt32 예외 방지)
+            Action<string, TextBox> setText = (k, tb) =>
+            {
+                if (map.TryGetValue(k, out string v) && !string.IsNullOrEmpty(v)) tb.Text = v;
+            };
+            Action<string, TrackBar> setTrack = (k, tbar) =>
+            {
+                if (map.TryGetValue(k, out string v) && int.TryParse(v, out int n))
+                    tbar.Value = Math.Max(tbar.Minimum, Math.Min(tbar.Maximum, n));
+            };
+
+            // Image Area Adjustment
+            if (map.TryGetValue("AdjMode", out string adjMode))
+            {
+                RB_AutoAdjust.Checked = adjMode == "Auto";
+                RB_ManualAdjust.Checked = adjMode == "Manual";
+                RB_NoneAdjust.Checked = adjMode == "None";
+            }
+            setText("AdjThreshold", TB_AdjThreshold);
+            setTrack("Brightness", TB_Brightness);
+            setBool("DenoiseColor", CB_DenoiseColor);
+            setText("DenoiseH", TB_DenoiseH);
+            setText("DenoiseHColor", TB_DenoiseHColor);
+            setText("DenoiseTSize", TB_DenoiseTSize);
+            setText("DenoiseSSize", TB_DenoiseSSize);
+            setBool("AutoLevel", CB_AutoLevel);
+            setText("AutoLevelMin", TB_AutoLevelMin);
+            setText("AutoLevelMax", TB_AutoLevelMax);
+            setBool("Sharpen", CB_Sharpen);
+            setTrack("SharpenAmount", TB_Sharpen);
+
+            // 사이즈 변경(ChangeSize/ResizeMode/W/H/Percent)은 복원하지 않고 매번 기본값 사용
+
+            setBool("Clip", CB_Clip);
+            setText("ClipTop", TB_ClipTop);
+            setText("ClipBottom", TB_ClipBottom);
+            setText("ClipLeft", TB_ClipLeft);
+            setText("ClipRight", TB_ClipRight);
+
+            setBool("CornerRounding", CB_CornerRounding);
+            setText("CornerRadius", TB_CornerRounding);
+            setBool("EdgeLine", CB_EdgeLine);
+
+            setBool("Waifu2x", CB_waifu2x);
+            setBool("Waifu2xTTA", CB_Waifu2xTTA);
+            if (map.TryGetValue("WaifuModel", out string waifuModel))
+            {
+                RB_WaifuCunet.Checked = waifuModel == "Cunet";
+                RB_WaifuAnime.Checked = waifuModel == "Anime";
+                RB_WaifuPhoto.Checked = waifuModel == "Photo";
+            }
+            if (map.TryGetValue("WaifuLevel", out string waifuLevel))
+            {
+                RB_WaifuLow.Checked = waifuLevel == "Low";
+                RB_WaifuMed.Checked = waifuLevel == "Med";
+                RB_WaifuHigh.Checked = waifuLevel == "High";
+                RB_WaifuHighest.Checked = waifuLevel == "Highest";
+            }
+
+            setBool("SubFolder", CB_SubFolder);
+            setBool("Overwrite", CB_Overwrite);
+
+            // 트랙바는 Value를 코드로 바꿔도 Scroll 이벤트가 안 나므로 라벨을 직접 갱신
+            lbl_BrightnessVal.Text = "Brightness : " + TB_Brightness.Value.ToString();
+            lbl_SharpenVal.Text = "Sharpen : " + TB_Sharpen.Value.ToString() + "%";
         }
 
         private void BTN_OpenFile_Click(object sender, EventArgs e)
@@ -117,6 +261,11 @@ namespace ScannedCardDenoiser
             BTN_AutoLevelDefault.Enabled = CB_AutoLevel.Checked;
         }
 
+        private void CB_Sharpen_CheckedChanged(object sender, EventArgs e)
+        {
+            TB_Sharpen.Enabled = CB_Sharpen.Checked;
+        }
+
         private void CB_DenoiseColor_CheckedChanged(object sender, EventArgs e)
         {
             TB_DenoiseH.Enabled = CB_DenoiseColor.Checked;
@@ -145,9 +294,14 @@ namespace ScannedCardDenoiser
             RB_Resize4x6.Enabled = CB_ChangeSize.Checked;
             RB_ResizeCarddass.Enabled = CB_ChangeSize.Checked;
             RB_ResizeTradingCard.Enabled = CB_ChangeSize.Checked;
+            RB_ResizePercent.Enabled = CB_ChangeSize.Checked;
 
-            TB_ResizeW.Enabled = CB_ChangeSize.Checked;
-            TB_ResizeH.Enabled = CB_ChangeSize.Checked && RB_ResizeCustom.Checked;
+            bool bPercent = RB_ResizePercent.Checked;
+
+            // 퍼센트 모드: 비율 입력칸만 사용, 픽셀(Long/Short) 입력은 비활성
+            TB_ResizePercent.Enabled = CB_ChangeSize.Checked && bPercent;
+            TB_ResizeW.Enabled = CB_ChangeSize.Checked && !bPercent;
+            TB_ResizeH.Enabled = CB_ChangeSize.Checked && !bPercent && RB_ResizeCustom.Checked;
 
             if (RB_Resize4x6.Checked)
             {
@@ -164,6 +318,11 @@ namespace ScannedCardDenoiser
         }
 
         private void RB_ResizeCustom_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateTBResize();
+        }
+
+        private void RB_ResizePercent_CheckedChanged(object sender, EventArgs e)
         {
             UpdateTBResize();
         }
@@ -196,10 +355,8 @@ namespace ScannedCardDenoiser
                     return;
             }
 
-            // 이번 실행에 입력한 경로를 다음 실행을 위해 저장
-            Properties.Settings.Default.SourcePath = TB_Source.Text;
-            Properties.Settings.Default.TargetPath = TB_Target.Text;
-            Properties.Settings.Default.Save();
+            // 이번 실행에 입력한 경로와 보정 옵션을 다음 실행을 위해 저장
+            SaveSettings();
 
             BTN_Execute.Enabled = false;
             BTN_Abort.Enabled = true;
@@ -379,8 +536,10 @@ namespace ScannedCardDenoiser
             Mat image = null;
             if (RB_ManualAdjust.Checked)
             {
-                int desireLong = CB_ChangeSize.Checked ? Convert.ToInt32(TB_ResizeW.Text) : 0;
-                int desireShort = CB_ChangeSize.Checked ? Convert.ToInt32(TB_ResizeH.Text) : 0;
+                // 퍼센트 모드는 절대 크기를 지정하지 않고(0) 이후 리사이즈 단계에서 비율로 처리
+                bool bSizeByPixel = CB_ChangeSize.Checked && !RB_ResizePercent.Checked;
+                int desireLong = bSizeByPixel ? Convert.ToInt32(TB_ResizeW.Text) : 0;
+                int desireShort = bSizeByPixel ? Convert.ToInt32(TB_ResizeH.Text) : 0;
 
                 // 다이얼로그는 반드시 UI 스레드에서 띄운다(배치 실행은 백그라운드 스레드이므로 Invoke).
                 Mat manualResult = null;
@@ -514,8 +673,19 @@ namespace ScannedCardDenoiser
             
             bool bHorizontal = imageSize.Width > imageSize.Height;
 
-            int X = CB_ChangeSize.Checked ? (bHorizontal ? Convert.ToInt32(TB_ResizeW.Text) : Convert.ToInt32(TB_ResizeH.Text)) : imageSize.Width;
-            int Y = CB_ChangeSize.Checked ? (bHorizontal ? Convert.ToInt32(TB_ResizeH.Text) : Convert.ToInt32(TB_ResizeW.Text)) : imageSize.Height;
+            int X, Y;
+            if (CB_ChangeSize.Checked && RB_ResizePercent.Checked)
+            {
+                // 퍼센트 모드: 원본(보정/크롭 후) 크기의 비율로 축소/확대
+                double pct = Convert.ToInt32(TB_ResizePercent.Text) * 0.01;
+                X = (int)Math.Round(imageSize.Width * pct);
+                Y = (int)Math.Round(imageSize.Height * pct);
+            }
+            else
+            {
+                X = CB_ChangeSize.Checked ? (bHorizontal ? Convert.ToInt32(TB_ResizeW.Text) : Convert.ToInt32(TB_ResizeH.Text)) : imageSize.Width;
+                Y = CB_ChangeSize.Checked ? (bHorizontal ? Convert.ToInt32(TB_ResizeH.Text) : Convert.ToInt32(TB_ResizeW.Text)) : imageSize.Height;
+            }
 
             if (X * Y == 0)
                 return null;
@@ -543,14 +713,19 @@ namespace ScannedCardDenoiser
             size.Width += ClipLeft + ClipRight;
             size.Height += ClipTop + ClipBottom;
 
-            Mat Original = new Mat();
-            Cv2.Resize(image, Original, size);
+            // 밝기 조정(톤 단계). 알파(4번째 채널)는 0으로 두어 변경하지 않는다.
+            int brightness = TB_Brightness.Value;
+            if (brightness > 0)
+                Cv2.Add(image, new Scalar(brightness, brightness, brightness, 0), image);
+            else if (brightness < 0)
+                Cv2.Subtract(image, new Scalar(-brightness, -brightness, -brightness, 0), image);
 
+            // 컬러 노이즈 제거
             Mat After = new Mat();
             if (CB_DenoiseColor.Checked)
             {
                 Cv2.FastNlMeansDenoisingColored(
-                    Original,
+                    image,
                     After,
                     Convert.ToInt32(TB_DenoiseH.Text),
                     Convert.ToInt32(TB_DenoiseHColor.Text),
@@ -560,9 +735,10 @@ namespace ScannedCardDenoiser
             }
             else
             {
-                Cv2.CopyTo(Original, After);
+                Cv2.CopyTo(image, After);
             }
 
+            // 오토 레벨
             Mat AutoLevelSrc = new Mat();
             if (CB_AutoLevel.Checked)
             {
@@ -573,12 +749,21 @@ namespace ScannedCardDenoiser
                 Cv2.CopyTo(After, AutoLevelSrc);
             }
 
-            // 밝기 조정(최종 톤 단계). 알파(4번째 채널)는 0으로 두어 변경하지 않는다.
-            int brightness = TB_Brightness.Value;
-            if (brightness > 0)
-                Cv2.Add(AutoLevelSrc, new Scalar(brightness, brightness, brightness, 0), AutoLevelSrc);
-            else if (brightness < 0)
-                Cv2.Subtract(AutoLevelSrc, new Scalar(-brightness, -brightness, -brightness, 0), AutoLevelSrc);
+            // 샤프닝(언샤프 마스크). 오토 레벨 결과에 적용한다. 가우시안 블러로 만든 저주파를 빼서
+            // 에지를 강조한다. Amount(%)가 클수록 강해진다. 알파(4번째 채널)는 균일(255)하므로 영향 없음.
+            if (CB_Sharpen.Checked && TB_Sharpen.Value > 0)
+            {
+                double amount = TB_Sharpen.Value / 100.0;
+                using (Mat blurred = new Mat())
+                {
+                    Cv2.GaussianBlur(AutoLevelSrc, blurred, new OpenCvSharp.Size(0, 0), 3);
+                    Cv2.AddWeighted(AutoLevelSrc, 1.0 + amount, blurred, -amount, 0, AutoLevelSrc);
+                }
+            }
+
+            // 리사이즈(마지막 단계). 톤 보정을 마친 원본 해상도 이미지를 목표 크기로 줄인다.
+            Mat Original = new Mat();
+            Cv2.Resize(AutoLevelSrc, Original, size);
 
             OpenCvSharp.Size ResultSize = new OpenCvSharp.Size(size.Width - ClipLeft - ClipRight, size.Height - ClipTop - ClipBottom);
             Mat Result = new Mat(ResultSize, MatType.CV_8UC4);
@@ -632,7 +817,7 @@ namespace ScannedCardDenoiser
                     }
                     else
                     {
-                        uint temp = AutoLevelSrc.At<uint>(HeightIdx, WidthIdx);
+                        uint temp = Original.At<uint>(HeightIdx, WidthIdx);
                         *pDstPixel = temp | 0xff000000;
                     }
                 }
@@ -1062,6 +1247,10 @@ namespace ScannedCardDenoiser
             {
                 Title += "[Brightness:" + TB_Brightness.Value + "]";
             }
+            if (CB_Sharpen.Checked && TB_Sharpen.Value > 0)
+            {
+                Title += "[Sharpen:" + TB_Sharpen.Value + "]";
+            }
 
             Mat tmpImage = Process(TB_Source.Text);
             if(tmpImage == null)
@@ -1235,6 +1424,11 @@ namespace ScannedCardDenoiser
         private void TB_Brightness_Scroll(object sender, EventArgs e)
         {
             lbl_BrightnessVal.Text = "Brightness : " + TB_Brightness.Value.ToString();
+        }
+
+        private void TB_Sharpen_Scroll(object sender, EventArgs e)
+        {
+            lbl_SharpenVal.Text = "Sharpen : " + TB_Sharpen.Value.ToString() + "%";
         }
 
         // Mat을 확대 슬라이더가 있는 프리뷰 창으로 표시(큰 이미지는 창에 맞게 축소).

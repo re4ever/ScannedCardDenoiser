@@ -46,5 +46,17 @@ namespace ScannedCardDenoiser.Properties {
                 this["TargetPath"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Preferences {
+            get {
+                return ((string)(this["Preferences"]));
+            }
+            set {
+                this["Preferences"] = value;
+            }
+        }
     }
 }

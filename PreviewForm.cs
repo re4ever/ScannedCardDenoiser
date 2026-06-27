@@ -37,7 +37,7 @@ namespace ScannedCardDenoiser
             };
             zoomLabel = new Label { AutoSize = true, Location = new Point(534, 11), Text = "100%" };
             Button btnFit = new Button { Text = "맞춤", AutoSize = true, Location = new Point(600, 7) };
-            Button btn100 = new Button { Text = "100%", AutoSize = true, Location = new Point(650, 7) };
+            Button btn100 = new Button { Text = "100%", AutoSize = true, Location = new Point(680, 7) };
             top.Controls.Add(lbl);
             top.Controls.Add(zoom);
             top.Controls.Add(zoomLabel);

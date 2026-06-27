@@ -72,6 +72,9 @@
             this.RB_ResizeCarddass = new System.Windows.Forms.RadioButton();
             this.RB_Resize4x6 = new System.Windows.Forms.RadioButton();
             this.RB_ResizeCustom = new System.Windows.Forms.RadioButton();
+            this.RB_ResizePercent = new System.Windows.Forms.RadioButton();
+            this.TB_ResizePercent = new System.Windows.Forms.TextBox();
+            this.label_ResizePct = new System.Windows.Forms.Label();
             this.label13 = new System.Windows.Forms.Label();
             this.TB_ResizeH = new System.Windows.Forms.TextBox();
             this.TB_ResizeW = new System.Windows.Forms.TextBox();
@@ -109,7 +112,11 @@
             this.CB_Overwrite = new System.Windows.Forms.CheckBox();
             this.TB_Brightness = new System.Windows.Forms.TrackBar();
             this.lbl_BrightnessVal = new System.Windows.Forms.Label();
+            this.CB_Sharpen = new System.Windows.Forms.CheckBox();
+            this.lbl_SharpenVal = new System.Windows.Forms.Label();
+            this.TB_Sharpen = new System.Windows.Forms.TrackBar();
             ((System.ComponentModel.ISupportInitialize)(this.TB_Brightness)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.TB_Sharpen)).BeginInit();
             this.groupBox1.SuspendLayout();
             this.groupBox5.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -194,7 +201,7 @@
             // BTN_Execute
             // 
             this.BTN_Execute.Enabled = false;
-            this.BTN_Execute.Location = new System.Drawing.Point(574, 437);
+            this.BTN_Execute.Location = new System.Drawing.Point(574, 502);
             this.BTN_Execute.Name = "BTN_Execute";
             this.BTN_Execute.Size = new System.Drawing.Size(104, 54);
             this.BTN_Execute.TabIndex = 7;
@@ -206,6 +213,9 @@
             // 
             this.groupBox1.Controls.Add(this.TB_Brightness);
             this.groupBox1.Controls.Add(this.lbl_BrightnessVal);
+            this.groupBox1.Controls.Add(this.CB_Sharpen);
+            this.groupBox1.Controls.Add(this.lbl_SharpenVal);
+            this.groupBox1.Controls.Add(this.TB_Sharpen);
             this.groupBox1.Controls.Add(this.groupBox5);
             this.groupBox1.Controls.Add(this.BTN_AutoLevelDefault);
             this.groupBox1.Controls.Add(this.BTN_DenoiseDefault);
@@ -227,7 +237,7 @@
             this.groupBox1.Controls.Add(this.CB_AutoLevel);
             this.groupBox1.Location = new System.Drawing.Point(14, 105);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(218, 355);
+            this.groupBox1.Size = new System.Drawing.Size(218, 420);
             this.groupBox1.TabIndex = 8;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "이미지 보정";
@@ -239,7 +249,7 @@
             this.groupBox5.Controls.Add(this.RB_ManualAdjust);
             this.groupBox5.Controls.Add(this.RB_AutoAdjust);
             this.groupBox5.Controls.Add(this.label14);
-            this.groupBox5.Location = new System.Drawing.Point(6, 197);
+            this.groupBox5.Location = new System.Drawing.Point(6, 16);
             this.groupBox5.Name = "groupBox5";
             this.groupBox5.Size = new System.Drawing.Size(206, 83);
             this.groupBox5.TabIndex = 12;
@@ -301,7 +311,7 @@
             // 
             // BTN_AutoLevelDefault
             // 
-            this.BTN_AutoLevelDefault.Location = new System.Drawing.Point(13, 58);
+            this.BTN_AutoLevelDefault.Location = new System.Drawing.Point(13, 304);
             this.BTN_AutoLevelDefault.Name = "BTN_AutoLevelDefault";
             this.BTN_AutoLevelDefault.Size = new System.Drawing.Size(52, 23);
             this.BTN_AutoLevelDefault.TabIndex = 8;
@@ -311,7 +321,7 @@
             // 
             // BTN_DenoiseDefault
             // 
-            this.BTN_DenoiseDefault.Location = new System.Drawing.Point(11, 162);
+            this.BTN_DenoiseDefault.Location = new System.Drawing.Point(11, 235);
             this.BTN_DenoiseDefault.Name = "BTN_DenoiseDefault";
             this.BTN_DenoiseDefault.Size = new System.Drawing.Size(52, 23);
             this.BTN_DenoiseDefault.TabIndex = 8;
@@ -321,7 +331,7 @@
             // 
             // TB_DenoiseSSize
             // 
-            this.TB_DenoiseSSize.Location = new System.Drawing.Point(147, 165);
+            this.TB_DenoiseSSize.Location = new System.Drawing.Point(147, 238);
             this.TB_DenoiseSSize.Name = "TB_DenoiseSSize";
             this.TB_DenoiseSSize.Size = new System.Drawing.Size(45, 21);
             this.TB_DenoiseSSize.TabIndex = 7;
@@ -331,7 +341,7 @@
             // 
             // TB_DenoiseTSize
             // 
-            this.TB_DenoiseTSize.Location = new System.Drawing.Point(147, 144);
+            this.TB_DenoiseTSize.Location = new System.Drawing.Point(147, 217);
             this.TB_DenoiseTSize.Name = "TB_DenoiseTSize";
             this.TB_DenoiseTSize.Size = new System.Drawing.Size(45, 21);
             this.TB_DenoiseTSize.TabIndex = 7;
@@ -341,7 +351,7 @@
             // 
             // TB_DenoiseHColor
             // 
-            this.TB_DenoiseHColor.Location = new System.Drawing.Point(171, 121);
+            this.TB_DenoiseHColor.Location = new System.Drawing.Point(171, 194);
             this.TB_DenoiseHColor.Name = "TB_DenoiseHColor";
             this.TB_DenoiseHColor.Size = new System.Drawing.Size(21, 21);
             this.TB_DenoiseHColor.TabIndex = 7;
@@ -351,7 +361,7 @@
             // 
             // TB_DenoiseH
             // 
-            this.TB_DenoiseH.Location = new System.Drawing.Point(93, 121);
+            this.TB_DenoiseH.Location = new System.Drawing.Point(93, 194);
             this.TB_DenoiseH.Name = "TB_DenoiseH";
             this.TB_DenoiseH.Size = new System.Drawing.Size(21, 21);
             this.TB_DenoiseH.TabIndex = 7;
@@ -362,7 +372,7 @@
             // label8
             // 
             this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(69, 168);
+            this.label8.Location = new System.Drawing.Point(69, 241);
             this.label8.Name = "label8";
             this.label8.Size = new System.Drawing.Size(74, 12);
             this.label8.TabIndex = 6;
@@ -371,7 +381,7 @@
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(57, 147);
+            this.label7.Location = new System.Drawing.Point(57, 220);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(87, 12);
             this.label7.TabIndex = 6;
@@ -380,7 +390,7 @@
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(123, 124);
+            this.label6.Location = new System.Drawing.Point(123, 197);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(42, 12);
             this.label6.TabIndex = 6;
@@ -389,7 +399,7 @@
             // label5
             // 
             this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(75, 124);
+            this.label5.Location = new System.Drawing.Point(75, 197);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(12, 12);
             this.label5.TabIndex = 6;
@@ -397,7 +407,7 @@
             // 
             // TB_AutoLevelMax
             // 
-            this.TB_AutoLevelMax.Location = new System.Drawing.Point(156, 54);
+            this.TB_AutoLevelMax.Location = new System.Drawing.Point(156, 300);
             this.TB_AutoLevelMax.Name = "TB_AutoLevelMax";
             this.TB_AutoLevelMax.Size = new System.Drawing.Size(36, 21);
             this.TB_AutoLevelMax.TabIndex = 5;
@@ -409,7 +419,7 @@
             // 
             this.label17.AutoSize = true;
             this.label17.Font = new System.Drawing.Font("굴림", 9F);
-            this.label17.Location = new System.Drawing.Point(194, 57);
+            this.label17.Location = new System.Drawing.Point(194, 303);
             this.label17.Name = "label17";
             this.label17.Size = new System.Drawing.Size(15, 12);
             this.label17.TabIndex = 2;
@@ -419,7 +429,7 @@
             // 
             this.label16.AutoSize = true;
             this.label16.Font = new System.Drawing.Font("굴림", 9F);
-            this.label16.Location = new System.Drawing.Point(194, 39);
+            this.label16.Location = new System.Drawing.Point(194, 285);
             this.label16.Name = "label16";
             this.label16.Size = new System.Drawing.Size(15, 12);
             this.label16.TabIndex = 2;
@@ -427,7 +437,7 @@
             // 
             // TB_AutoLevelMin
             // 
-            this.TB_AutoLevelMin.Location = new System.Drawing.Point(156, 36);
+            this.TB_AutoLevelMin.Location = new System.Drawing.Point(156, 282);
             this.TB_AutoLevelMin.Name = "TB_AutoLevelMin";
             this.TB_AutoLevelMin.Size = new System.Drawing.Size(36, 21);
             this.TB_AutoLevelMin.TabIndex = 4;
@@ -439,7 +449,7 @@
             // 
             this.label4.AutoSize = true;
             this.label4.Font = new System.Drawing.Font("굴림", 9F);
-            this.label4.Location = new System.Drawing.Point(124, 63);
+            this.label4.Location = new System.Drawing.Point(124, 309);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(30, 12);
             this.label4.TabIndex = 3;
@@ -449,7 +459,7 @@
             // 
             this.label3.AutoSize = true;
             this.label3.Font = new System.Drawing.Font("굴림", 9F);
-            this.label3.Location = new System.Drawing.Point(124, 45);
+            this.label3.Location = new System.Drawing.Point(124, 291);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(26, 12);
             this.label3.TabIndex = 2;
@@ -460,7 +470,7 @@
             this.CB_DenoiseColor.AutoSize = true;
             this.CB_DenoiseColor.Checked = true;
             this.CB_DenoiseColor.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_DenoiseColor.Location = new System.Drawing.Point(6, 99);
+            this.CB_DenoiseColor.Location = new System.Drawing.Point(6, 172);
             this.CB_DenoiseColor.Name = "CB_DenoiseColor";
             this.CB_DenoiseColor.Size = new System.Drawing.Size(173, 16);
             this.CB_DenoiseColor.TabIndex = 1;
@@ -473,7 +483,7 @@
             this.CB_AutoLevel.AutoSize = true;
             this.CB_AutoLevel.Checked = true;
             this.CB_AutoLevel.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_AutoLevel.Location = new System.Drawing.Point(6, 20);
+            this.CB_AutoLevel.Location = new System.Drawing.Point(6, 266);
             this.CB_AutoLevel.Name = "CB_AutoLevel";
             this.CB_AutoLevel.Size = new System.Drawing.Size(122, 16);
             this.CB_AutoLevel.TabIndex = 0;
@@ -506,6 +516,9 @@
             this.groupBox2.Controls.Add(this.TB_CornerRounding);
             this.groupBox2.Controls.Add(this.TB_ClipRight);
             this.groupBox2.Controls.Add(this.TB_ClipTop);
+            this.groupBox2.Controls.Add(this.RB_ResizePercent);
+            this.groupBox2.Controls.Add(this.TB_ResizePercent);
+            this.groupBox2.Controls.Add(this.label_ResizePct);
             this.groupBox2.Location = new System.Drawing.Point(249, 105);
             this.groupBox2.Name = "groupBox2";
             this.groupBox2.Size = new System.Drawing.Size(218, 303);
@@ -564,7 +577,7 @@
             // 
             this.RB_ResizeTradingCard.AutoSize = true;
             this.RB_ResizeTradingCard.Enabled = false;
-            this.RB_ResizeTradingCard.Location = new System.Drawing.Point(34, 135);
+            this.RB_ResizeTradingCard.Location = new System.Drawing.Point(34, 123);
             this.RB_ResizeTradingCard.Name = "RB_ResizeTradingCard";
             this.RB_ResizeTradingCard.Size = new System.Drawing.Size(154, 16);
             this.RB_ResizeTradingCard.TabIndex = 7;
@@ -577,7 +590,7 @@
             this.RB_ResizeCarddass.AutoSize = true;
             this.RB_ResizeCarddass.Checked = true;
             this.RB_ResizeCarddass.Enabled = false;
-            this.RB_ResizeCarddass.Location = new System.Drawing.Point(34, 113);
+            this.RB_ResizeCarddass.Location = new System.Drawing.Point(34, 105);
             this.RB_ResizeCarddass.Name = "RB_ResizeCarddass";
             this.RB_ResizeCarddass.Size = new System.Drawing.Size(139, 16);
             this.RB_ResizeCarddass.TabIndex = 7;
@@ -590,7 +603,7 @@
             // 
             this.RB_Resize4x6.AutoSize = true;
             this.RB_Resize4x6.Enabled = false;
-            this.RB_Resize4x6.Location = new System.Drawing.Point(34, 91);
+            this.RB_Resize4x6.Location = new System.Drawing.Point(34, 87);
             this.RB_Resize4x6.Name = "RB_Resize4x6";
             this.RB_Resize4x6.Size = new System.Drawing.Size(175, 16);
             this.RB_Resize4x6.TabIndex = 7;
@@ -609,7 +622,40 @@
             this.RB_ResizeCustom.Text = "Custom";
             this.RB_ResizeCustom.UseVisualStyleBackColor = true;
             this.RB_ResizeCustom.CheckedChanged += new System.EventHandler(this.RB_ResizeCustom_CheckedChanged);
-            // 
+            //
+            // RB_ResizePercent
+            //
+            this.RB_ResizePercent.AutoSize = true;
+            this.RB_ResizePercent.Enabled = false;
+            this.RB_ResizePercent.Location = new System.Drawing.Point(34, 141);
+            this.RB_ResizePercent.Name = "RB_ResizePercent";
+            this.RB_ResizePercent.Size = new System.Drawing.Size(67, 16);
+            this.RB_ResizePercent.TabIndex = 7;
+            this.RB_ResizePercent.Text = "Percent";
+            this.RB_ResizePercent.UseVisualStyleBackColor = true;
+            this.RB_ResizePercent.CheckedChanged += new System.EventHandler(this.RB_ResizePercent_CheckedChanged);
+            //
+            // TB_ResizePercent
+            //
+            this.TB_ResizePercent.Enabled = false;
+            this.TB_ResizePercent.Location = new System.Drawing.Point(110, 139);
+            this.TB_ResizePercent.Name = "TB_ResizePercent";
+            this.TB_ResizePercent.Size = new System.Drawing.Size(37, 21);
+            this.TB_ResizePercent.TabIndex = 5;
+            this.TB_ResizePercent.Text = "100";
+            this.TB_ResizePercent.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.TB_ResizePercent.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.TB_OnlyDigit_KeyPressed);
+            //
+            // label_ResizePct
+            //
+            this.label_ResizePct.AutoSize = true;
+            this.label_ResizePct.Font = new System.Drawing.Font("굴림", 9F);
+            this.label_ResizePct.Location = new System.Drawing.Point(149, 143);
+            this.label_ResizePct.Name = "label_ResizePct";
+            this.label_ResizePct.Size = new System.Drawing.Size(15, 12);
+            this.label_ResizePct.TabIndex = 2;
+            this.label_ResizePct.Text = "%";
+            //
             // label13
             // 
             this.label13.AutoSize = true;
@@ -768,7 +814,7 @@
             // PB_Progress
             // 
             this.PB_Progress.Enabled = false;
-            this.PB_Progress.Location = new System.Drawing.Point(14, 474);
+            this.PB_Progress.Location = new System.Drawing.Point(14, 539);
             this.PB_Progress.Name = "PB_Progress";
             this.PB_Progress.Size = new System.Drawing.Size(554, 14);
             this.PB_Progress.TabIndex = 10;
@@ -778,7 +824,7 @@
             this.Label_Progress.AutoSize = true;
             this.Label_Progress.BackColor = System.Drawing.Color.Transparent;
             this.Label_Progress.Font = new System.Drawing.Font("굴림", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
-            this.Label_Progress.Location = new System.Drawing.Point(408, 461);
+            this.Label_Progress.Location = new System.Drawing.Point(408, 526);
             this.Label_Progress.Name = "Label_Progress";
             this.Label_Progress.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.Label_Progress.Size = new System.Drawing.Size(165, 11);
@@ -790,7 +836,7 @@
             // BTN_Abort
             // 
             this.BTN_Abort.Enabled = false;
-            this.BTN_Abort.Location = new System.Drawing.Point(684, 437);
+            this.BTN_Abort.Location = new System.Drawing.Point(684, 502);
             this.BTN_Abort.Name = "BTN_Abort";
             this.BTN_Abort.Size = new System.Drawing.Size(66, 54);
             this.BTN_Abort.TabIndex = 7;
@@ -811,7 +857,7 @@
             // BTN_ShowPreview
             // 
             this.BTN_ShowPreview.Enabled = false;
-            this.BTN_ShowPreview.Location = new System.Drawing.Point(574, 396);
+            this.BTN_ShowPreview.Location = new System.Drawing.Point(574, 461);
             this.BTN_ShowPreview.Name = "BTN_ShowPreview";
             this.BTN_ShowPreview.Size = new System.Drawing.Size(176, 28);
             this.BTN_ShowPreview.TabIndex = 13;
@@ -970,7 +1016,7 @@
             // Label_FileName
             // 
             this.Label_FileName.AutoSize = true;
-            this.Label_FileName.Location = new System.Drawing.Point(13, 456);
+            this.Label_FileName.Location = new System.Drawing.Point(13, 521);
             this.Label_FileName.Name = "Label_FileName";
             this.Label_FileName.Size = new System.Drawing.Size(108, 12);
             this.Label_FileName.TabIndex = 15;
@@ -990,14 +1036,14 @@
             // lbl_BrightnessVal
             //
             this.lbl_BrightnessVal.AutoSize = true;
-            this.lbl_BrightnessVal.Location = new System.Drawing.Point(6, 289);
+            this.lbl_BrightnessVal.Location = new System.Drawing.Point(6, 104);
             this.lbl_BrightnessVal.Name = "lbl_BrightnessVal";
             this.lbl_BrightnessVal.Size = new System.Drawing.Size(120, 12);
             this.lbl_BrightnessVal.Text = "Brightness : 0";
             //
             // TB_Brightness
             //
-            this.TB_Brightness.Location = new System.Drawing.Point(6, 305);
+            this.TB_Brightness.Location = new System.Drawing.Point(6, 120);
             this.TB_Brightness.Maximum = 100;
             this.TB_Brightness.Minimum = -100;
             this.TB_Brightness.Name = "TB_Brightness";
@@ -1007,11 +1053,43 @@
             this.TB_Brightness.Value = 0;
             this.TB_Brightness.Scroll += new System.EventHandler(this.TB_Brightness_Scroll);
             //
+            // CB_Sharpen
+            //
+            this.CB_Sharpen.AutoSize = true;
+            this.CB_Sharpen.Location = new System.Drawing.Point(6, 334);
+            this.CB_Sharpen.Name = "CB_Sharpen";
+            this.CB_Sharpen.Size = new System.Drawing.Size(72, 16);
+            this.CB_Sharpen.TabIndex = 17;
+            this.CB_Sharpen.Text = "Sharpen";
+            this.CB_Sharpen.UseVisualStyleBackColor = true;
+            this.CB_Sharpen.CheckedChanged += new System.EventHandler(this.CB_Sharpen_CheckedChanged);
+            //
+            // lbl_SharpenVal
+            //
+            this.lbl_SharpenVal.AutoSize = true;
+            this.lbl_SharpenVal.Location = new System.Drawing.Point(90, 335);
+            this.lbl_SharpenVal.Name = "lbl_SharpenVal";
+            this.lbl_SharpenVal.Size = new System.Drawing.Size(29, 12);
+            this.lbl_SharpenVal.Text = "0%";
+            //
+            // TB_Sharpen
+            //
+            this.TB_Sharpen.Enabled = false;
+            this.TB_Sharpen.Location = new System.Drawing.Point(6, 350);
+            this.TB_Sharpen.Maximum = 200;
+            this.TB_Sharpen.Minimum = 0;
+            this.TB_Sharpen.Name = "TB_Sharpen";
+            this.TB_Sharpen.Size = new System.Drawing.Size(200, 45);
+            this.TB_Sharpen.TabIndex = 18;
+            this.TB_Sharpen.TickFrequency = 20;
+            this.TB_Sharpen.Value = 0;
+            this.TB_Sharpen.Scroll += new System.EventHandler(this.TB_Sharpen_Scroll);
+            //
             // MainForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 500);
+            this.ClientSize = new System.Drawing.Size(800, 565);
             this.Controls.Add(this.CB_Overwrite);
             this.Controls.Add(this.Label_FileName);
             this.Controls.Add(this.groupBox3);
@@ -1047,6 +1125,7 @@
             this.groupBox4.ResumeLayout(false);
             this.groupBox4.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.TB_Brightness)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.TB_Sharpen)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1056,6 +1135,9 @@
 
         private System.Windows.Forms.TrackBar TB_Brightness;
         private System.Windows.Forms.Label lbl_BrightnessVal;
+        private System.Windows.Forms.CheckBox CB_Sharpen;
+        private System.Windows.Forms.Label lbl_SharpenVal;
+        private System.Windows.Forms.TrackBar TB_Sharpen;
         private System.Windows.Forms.OpenFileDialog openFileDialog;
         private System.Windows.Forms.Button BTN_OpenFile;
         private System.Windows.Forms.TextBox TB_Source;
@@ -1097,6 +1179,9 @@
         private System.Windows.Forms.RadioButton RB_ResizeCarddass;
         private System.Windows.Forms.RadioButton RB_Resize4x6;
         private System.Windows.Forms.RadioButton RB_ResizeCustom;
+        private System.Windows.Forms.RadioButton RB_ResizePercent;
+        private System.Windows.Forms.TextBox TB_ResizePercent;
+        private System.Windows.Forms.Label label_ResizePct;
         private System.Windows.Forms.Label label13;
         private System.Windows.Forms.TextBox TB_ResizeH;
         private System.Windows.Forms.TextBox TB_ResizeW;

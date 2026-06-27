@@ -7,7 +7,7 @@
           <value>
             <TabSessionState>
               <option name="provider" value="claude" />
-              <option name="sessionId" value="11b88cf4-2c39-43fa-97cc-682f9141ac1f" />
+              <option name="sessionId" value="826f1e5a-5fb6-43b4-9044-c87f6acb612a" />
               <option name="cwd" value="$PROJECT_DIR$" />
               <option name="model" value="claude-opus-4-8[1m]" />
               <option name="permissionMode" value="bypassPermissions" />
