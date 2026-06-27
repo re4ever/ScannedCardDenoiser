@@ -22,5 +22,29 @@ namespace ScannedCardDenoiser.Properties {
                 return defaultInstance;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SourcePath {
+            get {
+                return ((string)(this["SourcePath"]));
+            }
+            set {
+                this["SourcePath"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string TargetPath {
+            get {
+                return ((string)(this["TargetPath"]));
+            }
+            set {
+                this["TargetPath"] = value;
+            }
+        }
     }
 }

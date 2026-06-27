@@ -39,9 +39,12 @@
             this.BTN_TargetFolder = new System.Windows.Forms.Button();
             this.BTN_Execute = new System.Windows.Forms.Button();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.groupBox5 = new System.Windows.Forms.GroupBox();
+            this.RB_NoneAdjust = new System.Windows.Forms.RadioButton();
             this.TB_AdjThreshold = new System.Windows.Forms.TextBox();
+            this.RB_ManualAdjust = new System.Windows.Forms.RadioButton();
+            this.RB_AutoAdjust = new System.Windows.Forms.RadioButton();
             this.label14 = new System.Windows.Forms.Label();
-            this.CB_AutoAdjust = new System.Windows.Forms.CheckBox();
             this.BTN_AutoLevelDefault = new System.Windows.Forms.Button();
             this.BTN_DenoiseDefault = new System.Windows.Forms.Button();
             this.TB_DenoiseSSize = new System.Windows.Forms.TextBox();
@@ -104,7 +107,11 @@
             this.RB_WaifuLow = new System.Windows.Forms.RadioButton();
             this.Label_FileName = new System.Windows.Forms.Label();
             this.CB_Overwrite = new System.Windows.Forms.CheckBox();
+            this.TB_Brightness = new System.Windows.Forms.TrackBar();
+            this.lbl_BrightnessVal = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.TB_Brightness)).BeginInit();
             this.groupBox1.SuspendLayout();
+            this.groupBox5.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox3.SuspendLayout();
             this.groupBox6.SuspendLayout();
@@ -187,7 +194,7 @@
             // BTN_Execute
             // 
             this.BTN_Execute.Enabled = false;
-            this.BTN_Execute.Location = new System.Drawing.Point(574, 387);
+            this.BTN_Execute.Location = new System.Drawing.Point(574, 437);
             this.BTN_Execute.Name = "BTN_Execute";
             this.BTN_Execute.Size = new System.Drawing.Size(104, 54);
             this.BTN_Execute.TabIndex = 7;
@@ -197,9 +204,9 @@
             // 
             // groupBox1
             // 
-            this.groupBox1.Controls.Add(this.TB_AdjThreshold);
-            this.groupBox1.Controls.Add(this.label14);
-            this.groupBox1.Controls.Add(this.CB_AutoAdjust);
+            this.groupBox1.Controls.Add(this.TB_Brightness);
+            this.groupBox1.Controls.Add(this.lbl_BrightnessVal);
+            this.groupBox1.Controls.Add(this.groupBox5);
             this.groupBox1.Controls.Add(this.BTN_AutoLevelDefault);
             this.groupBox1.Controls.Add(this.BTN_DenoiseDefault);
             this.groupBox1.Controls.Add(this.TB_DenoiseSSize);
@@ -220,14 +227,38 @@
             this.groupBox1.Controls.Add(this.CB_AutoLevel);
             this.groupBox1.Location = new System.Drawing.Point(14, 105);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(218, 249);
+            this.groupBox1.Size = new System.Drawing.Size(218, 355);
             this.groupBox1.TabIndex = 8;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "이미지 보정";
             // 
+            // groupBox5
+            // 
+            this.groupBox5.Controls.Add(this.RB_NoneAdjust);
+            this.groupBox5.Controls.Add(this.TB_AdjThreshold);
+            this.groupBox5.Controls.Add(this.RB_ManualAdjust);
+            this.groupBox5.Controls.Add(this.RB_AutoAdjust);
+            this.groupBox5.Controls.Add(this.label14);
+            this.groupBox5.Location = new System.Drawing.Point(6, 197);
+            this.groupBox5.Name = "groupBox5";
+            this.groupBox5.Size = new System.Drawing.Size(206, 83);
+            this.groupBox5.TabIndex = 12;
+            this.groupBox5.TabStop = false;
+            this.groupBox5.Text = "Image Area Adjustment";
+            // 
+            // RB_NoneAdjust
+            // 
+            this.RB_NoneAdjust.AutoSize = true;
+            this.RB_NoneAdjust.Location = new System.Drawing.Point(7, 16);
+            this.RB_NoneAdjust.Name = "RB_NoneAdjust";
+            this.RB_NoneAdjust.Size = new System.Drawing.Size(39, 16);
+            this.RB_NoneAdjust.TabIndex = 13;
+            this.RB_NoneAdjust.Text = "No";
+            this.RB_NoneAdjust.UseVisualStyleBackColor = true;
+            // 
             // TB_AdjThreshold
             // 
-            this.TB_AdjThreshold.Location = new System.Drawing.Point(151, 214);
+            this.TB_AdjThreshold.Location = new System.Drawing.Point(162, 17);
             this.TB_AdjThreshold.Name = "TB_AdjThreshold";
             this.TB_AdjThreshold.Size = new System.Drawing.Size(41, 21);
             this.TB_AdjThreshold.TabIndex = 11;
@@ -235,27 +266,38 @@
             this.TB_AdjThreshold.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.TB_AdjThreshold.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.TB_OnlyDigit_KeyPressed);
             // 
+            // RB_ManualAdjust
+            // 
+            this.RB_ManualAdjust.AutoSize = true;
+            this.RB_ManualAdjust.Location = new System.Drawing.Point(7, 62);
+            this.RB_ManualAdjust.Name = "RB_ManualAdjust";
+            this.RB_ManualAdjust.Size = new System.Drawing.Size(153, 16);
+            this.RB_ManualAdjust.TabIndex = 12;
+            this.RB_ManualAdjust.Text = "Manual (Experimental)";
+            this.RB_ManualAdjust.UseVisualStyleBackColor = true;
+            // 
+            // RB_AutoAdjust
+            // 
+            this.RB_AutoAdjust.AutoSize = true;
+            this.RB_AutoAdjust.Checked = true;
+            this.RB_AutoAdjust.Location = new System.Drawing.Point(7, 39);
+            this.RB_AutoAdjust.Name = "RB_AutoAdjust";
+            this.RB_AutoAdjust.Size = new System.Drawing.Size(48, 16);
+            this.RB_AutoAdjust.TabIndex = 11;
+            this.RB_AutoAdjust.TabStop = true;
+            this.RB_AutoAdjust.Text = "Auto";
+            this.RB_AutoAdjust.UseVisualStyleBackColor = true;
+            this.RB_AutoAdjust.CheckedChanged += new System.EventHandler(this.RB_AutoAdjust_CheckedChanged);
+            // 
             // label14
             // 
             this.label14.AutoSize = true;
-            this.label14.Location = new System.Drawing.Point(84, 218);
+            this.label14.Font = new System.Drawing.Font("굴림", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
+            this.label14.Location = new System.Drawing.Point(95, 21);
             this.label14.Name = "label14";
-            this.label14.Size = new System.Drawing.Size(62, 12);
+            this.label14.Size = new System.Drawing.Size(61, 11);
             this.label14.TabIndex = 10;
             this.label14.Text = "Threshold";
-            // 
-            // CB_AutoAdjust
-            // 
-            this.CB_AutoAdjust.AutoSize = true;
-            this.CB_AutoAdjust.Checked = true;
-            this.CB_AutoAdjust.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_AutoAdjust.Location = new System.Drawing.Point(7, 198);
-            this.CB_AutoAdjust.Name = "CB_AutoAdjust";
-            this.CB_AutoAdjust.Size = new System.Drawing.Size(116, 16);
-            this.CB_AutoAdjust.TabIndex = 9;
-            this.CB_AutoAdjust.Text = "Auto Adjustment";
-            this.CB_AutoAdjust.UseVisualStyleBackColor = true;
-            this.CB_AutoAdjust.CheckedChanged += new System.EventHandler(this.CB_AutoAdjust_CheckedChanged);
             // 
             // BTN_AutoLevelDefault
             // 
@@ -726,7 +768,7 @@
             // PB_Progress
             // 
             this.PB_Progress.Enabled = false;
-            this.PB_Progress.Location = new System.Drawing.Point(14, 424);
+            this.PB_Progress.Location = new System.Drawing.Point(14, 474);
             this.PB_Progress.Name = "PB_Progress";
             this.PB_Progress.Size = new System.Drawing.Size(554, 14);
             this.PB_Progress.TabIndex = 10;
@@ -736,7 +778,7 @@
             this.Label_Progress.AutoSize = true;
             this.Label_Progress.BackColor = System.Drawing.Color.Transparent;
             this.Label_Progress.Font = new System.Drawing.Font("굴림", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
-            this.Label_Progress.Location = new System.Drawing.Point(408, 411);
+            this.Label_Progress.Location = new System.Drawing.Point(408, 461);
             this.Label_Progress.Name = "Label_Progress";
             this.Label_Progress.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.Label_Progress.Size = new System.Drawing.Size(165, 11);
@@ -748,7 +790,7 @@
             // BTN_Abort
             // 
             this.BTN_Abort.Enabled = false;
-            this.BTN_Abort.Location = new System.Drawing.Point(684, 387);
+            this.BTN_Abort.Location = new System.Drawing.Point(684, 437);
             this.BTN_Abort.Name = "BTN_Abort";
             this.BTN_Abort.Size = new System.Drawing.Size(66, 54);
             this.BTN_Abort.TabIndex = 7;
@@ -769,7 +811,7 @@
             // BTN_ShowPreview
             // 
             this.BTN_ShowPreview.Enabled = false;
-            this.BTN_ShowPreview.Location = new System.Drawing.Point(574, 346);
+            this.BTN_ShowPreview.Location = new System.Drawing.Point(574, 396);
             this.BTN_ShowPreview.Name = "BTN_ShowPreview";
             this.BTN_ShowPreview.Size = new System.Drawing.Size(176, 28);
             this.BTN_ShowPreview.TabIndex = 13;
@@ -798,7 +840,7 @@
             this.BTN_waifu2x.TabIndex = 4;
             this.BTN_waifu2x.Text = "waifu2x_ncnn_vulkan.exe 연결 필요";
             this.BTN_waifu2x.UseVisualStyleBackColor = true;
-            this.BTN_waifu2x.Click += new System.EventHandler(this.button1_Click);
+            this.BTN_waifu2x.Click += new System.EventHandler(this.BTN_waifu2x_Click);
             // 
             // groupBox6
             // 
@@ -928,7 +970,7 @@
             // Label_FileName
             // 
             this.Label_FileName.AutoSize = true;
-            this.Label_FileName.Location = new System.Drawing.Point(13, 406);
+            this.Label_FileName.Location = new System.Drawing.Point(13, 456);
             this.Label_FileName.Name = "Label_FileName";
             this.Label_FileName.Size = new System.Drawing.Size(108, 12);
             this.Label_FileName.TabIndex = 15;
@@ -944,12 +986,32 @@
             this.CB_Overwrite.TabIndex = 16;
             this.CB_Overwrite.Text = "Overwrite";
             this.CB_Overwrite.UseVisualStyleBackColor = true;
-            // 
+            //
+            // lbl_BrightnessVal
+            //
+            this.lbl_BrightnessVal.AutoSize = true;
+            this.lbl_BrightnessVal.Location = new System.Drawing.Point(6, 289);
+            this.lbl_BrightnessVal.Name = "lbl_BrightnessVal";
+            this.lbl_BrightnessVal.Size = new System.Drawing.Size(120, 12);
+            this.lbl_BrightnessVal.Text = "Brightness : 0";
+            //
+            // TB_Brightness
+            //
+            this.TB_Brightness.Location = new System.Drawing.Point(6, 305);
+            this.TB_Brightness.Maximum = 100;
+            this.TB_Brightness.Minimum = -100;
+            this.TB_Brightness.Name = "TB_Brightness";
+            this.TB_Brightness.Size = new System.Drawing.Size(200, 45);
+            this.TB_Brightness.TabIndex = 0;
+            this.TB_Brightness.TickFrequency = 20;
+            this.TB_Brightness.Value = 0;
+            this.TB_Brightness.Scroll += new System.EventHandler(this.TB_Brightness_Scroll);
+            //
             // MainForm
-            // 
+            //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 452);
+            this.ClientSize = new System.Drawing.Size(800, 500);
             this.Controls.Add(this.CB_Overwrite);
             this.Controls.Add(this.Label_FileName);
             this.Controls.Add(this.groupBox3);
@@ -974,6 +1036,8 @@
             this.Load += new System.EventHandler(this.Form1_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
+            this.groupBox5.ResumeLayout(false);
+            this.groupBox5.PerformLayout();
             this.groupBox2.ResumeLayout(false);
             this.groupBox2.PerformLayout();
             this.groupBox3.ResumeLayout(false);
@@ -982,6 +1046,7 @@
             this.groupBox6.PerformLayout();
             this.groupBox4.ResumeLayout(false);
             this.groupBox4.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.TB_Brightness)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -989,6 +1054,8 @@
 
         #endregion
 
+        private System.Windows.Forms.TrackBar TB_Brightness;
+        private System.Windows.Forms.Label lbl_BrightnessVal;
         private System.Windows.Forms.OpenFileDialog openFileDialog;
         private System.Windows.Forms.Button BTN_OpenFile;
         private System.Windows.Forms.TextBox TB_Source;
@@ -1056,7 +1123,6 @@
         private System.Windows.Forms.CheckBox CB_waifu2x;
         private System.Windows.Forms.RadioButton RB_WaifuPhoto;
         private System.Windows.Forms.Button BTN_waifu2x;
-        private System.Windows.Forms.CheckBox CB_AutoAdjust;
         private System.Windows.Forms.TextBox TB_AdjThreshold;
         private System.Windows.Forms.Label label14;
         private System.Windows.Forms.Label Label_FileName;
@@ -1064,6 +1130,10 @@
         private System.Windows.Forms.Label label18;
         private System.Windows.Forms.CheckBox CB_Waifu2xTTA;
         private System.Windows.Forms.CheckBox CB_Overwrite;
+        private System.Windows.Forms.GroupBox groupBox5;
+        private System.Windows.Forms.RadioButton RB_ManualAdjust;
+        private System.Windows.Forms.RadioButton RB_AutoAdjust;
+        private System.Windows.Forms.RadioButton RB_NoneAdjust;
     }
 }
 
