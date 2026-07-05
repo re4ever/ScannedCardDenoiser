@@ -9,6 +9,8 @@ using System.Threading;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Diagnostics;
 using System.Collections.Generic;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 using Path = System.IO.Path;
 
 namespace ScannedCardDenoiser
@@ -24,6 +26,7 @@ namespace ScannedCardDenoiser
         private volatile bool abortRequested;
         string waifu2xExePath;
         string[] sourceFiles;
+        private readonly ToolTip toolTip1 = new ToolTip();
 
         public MainForm()
         {
@@ -43,6 +46,8 @@ namespace ScannedCardDenoiser
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            SetupTooltips();
+
             // 이전 실행에서 저장한 입력 경로 복원
             if (!string.IsNullOrEmpty(Properties.Settings.Default.SourcePath))
                 TB_Source.Text = Properties.Settings.Default.SourcePath;
@@ -58,6 +63,97 @@ namespace ScannedCardDenoiser
             UpdateTBResize();
         }
 
+        // 각 컨트롤에 마우스를 올리면 나오는 도움말(툴팁)을 설정한다.
+        private void SetupTooltips()
+        {
+            toolTip1.AutoPopDelay = 30000;
+            toolTip1.InitialDelay = 400;
+            toolTip1.ReshowDelay = 100;
+            toolTip1.ShowAlways = true;
+
+            // 입출력
+            toolTip1.SetToolTip(TB_Source, "처리할 원본 이미지/PDF 파일 또는 폴더 경로입니다.");
+            toolTip1.SetToolTip(BTN_OpenFile, "원본 이미지 또는 PDF 파일을 선택합니다(여러 개 선택 가능).");
+            toolTip1.SetToolTip(BTN_OpenFolder, "원본이 들어있는 폴더를 선택합니다.");
+            toolTip1.SetToolTip(TB_Target, "결과 PNG를 저장할 폴더 경로입니다.");
+            toolTip1.SetToolTip(BTN_TargetFolder, "결과를 저장할 폴더를 선택합니다.");
+            toolTip1.SetToolTip(CB_SubFolder, "원본이 폴더일 때 하위 폴더까지 재귀적으로 처리합니다.");
+            toolTip1.SetToolTip(CB_Overwrite, "이미 같은 이름의 결과 파일이 있어도 다시 처리해 덮어씁니다.\n끄면 결과가 있는 파일은 건너뜁니다.");
+            toolTip1.SetToolTip(CB_PdfExtract, "PDF의 각 페이지에 든 임베디드 이미지를 원본 폴더에 '페이지번호'로 추출한 뒤 처리합니다.\n끄면 PDF는 건너뜁니다.");
+
+            // 영역 보정(Image Area Adjustment)
+            toolTip1.SetToolTip(RB_NoneAdjust, "회전/크롭 없이 원본 영역을 그대로 사용합니다.");
+            toolTip1.SetToolTip(RB_AutoAdjust, "카드 테두리를 자동으로 찾아 기울기를 보정(회전)하고 카드 영역만 잘라냅니다.");
+            toolTip1.SetToolTip(RB_ManualAdjust, "파일마다 창을 띄워 네 모서리를 직접 지정합니다.\n폴더(다중 파일) 선택 시 각 파일마다 순서대로 창이 뜹니다.");
+            toolTip1.SetToolTip(TB_AdjThreshold,
+                "카드 검출 임계값(0=기본). 두 가지를 함께 제어합니다.\n" +
+                "1) 카드/배경 분리(Otsu 오프셋): 양수=더 밝은 테두리까지 카드로 포함.\n" +
+                "2) 엣지라인 검출 민감도: 양수일수록 Canny/Hough 문턱을 높여\n" +
+                "   카드 경계 노이즈로 생기는 엣지를 억제합니다(노이즈 심하면 +20~60).");
+
+            // 밝기
+            toolTip1.SetToolTip(CB_Brightness, "밝기 조정 사용 여부. 체크하면 아래 트랙바 값만큼 밝기를 가감합니다.");
+            toolTip1.SetToolTip(TB_Brightness, "밝기를 -100~+100 범위로 가감합니다(0=변화 없음). 'Brightness' 체크 시 적용.");
+
+            // 노이즈 제거
+            toolTip1.SetToolTip(CB_DenoiseColor, "비지역 평균(Non-local Means) 컬러 노이즈 제거를 적용합니다.");
+            toolTip1.SetToolTip(TB_DenoiseH, "밝기(휘도) 노이즈 제거 강도 h. 클수록 노이즈는 줄지만 디테일도 뭉갭니다.");
+            toolTip1.SetToolTip(TB_DenoiseHColor, "색상 노이즈 제거 강도 hColor. 클수록 색 얼룩이 줄어듭니다.");
+            toolTip1.SetToolTip(TB_DenoiseTSize, "템플릿 창 크기(픽셀). 비교에 사용하는 패치 크기입니다.");
+            toolTip1.SetToolTip(TB_DenoiseSSize, "검색 창 크기(픽셀). 클수록 품질이 오르지만 매우 느려집니다.");
+            toolTip1.SetToolTip(BTN_DenoiseDefault, "노이즈 제거 파라미터를 기본값으로 되돌립니다.");
+
+            // 오토 레벨
+            toolTip1.SetToolTip(CB_AutoLevel, "채널별 히스토그램을 늘려 대비를 자동 보정합니다(오토 레벨).");
+            toolTip1.SetToolTip(TB_AutoLevelMin, "하위(어두운 쪽) 클리핑 비율(%). 이 비율만큼 어두운 화소를 검정으로 밀어냅니다.");
+            toolTip1.SetToolTip(TB_AutoLevelMax, "상위(밝은 쪽) 클리핑 비율(%). 이 비율만큼 밝은 화소를 흰색으로 밀어냅니다.");
+            toolTip1.SetToolTip(BTN_AutoLevelDefault, "오토 레벨 값을 기본값으로 되돌립니다.");
+
+            // 샤프닝
+            toolTip1.SetToolTip(CB_Sharpen, "언샤프 마스크로 윤곽을 또렷하게 합니다.");
+            toolTip1.SetToolTip(TB_Sharpen, "샤프닝 강도(%). 0=끔. 클수록 강해지며 노이즈도 함께 강조될 수 있습니다.");
+
+            // 크기 변경
+            toolTip1.SetToolTip(CB_ChangeSize, "결과 이미지의 크기를 바꿉니다. 끄면 원본(크롭 후) 크기를 유지합니다.");
+            toolTip1.SetToolTip(RB_ResizeCustom, "긴 변/짧은 변 픽셀을 직접 지정합니다.");
+            toolTip1.SetToolTip(RB_Resize4x6, "절지 비율(1:√2)로 짧은 변을 자동 계산합니다.");
+            toolTip1.SetToolTip(RB_ResizeCarddass, "카드다스 비율(86:59)로 짧은 변을 자동 계산합니다.");
+            toolTip1.SetToolTip(RB_ResizeTradingCard, "트레이딩카드 비율(89:63)로 짧은 변을 자동 계산합니다.");
+            toolTip1.SetToolTip(RB_ResizePercent, "원본(크롭 후) 크기의 비율(%)로 축소/확대합니다. 가로·세로 동일 비율.");
+            toolTip1.SetToolTip(TB_ResizeW, "긴 변의 목표 픽셀 크기입니다.");
+            toolTip1.SetToolTip(TB_ResizeH, "짧은 변의 픽셀 크기입니다(프리셋에서는 자동 계산됨).");
+            toolTip1.SetToolTip(TB_ResizePercent, "리사이즈 비율(%). 100=원본 크기 유지.");
+
+            // 모서리 자르기
+            toolTip1.SetToolTip(CB_Clip, "결과 가장자리를 지정 픽셀만큼 잘라냅니다(스캔 여백 제거).");
+            toolTip1.SetToolTip(TB_ClipTop, "위쪽에서 잘라낼 픽셀 수.");
+            toolTip1.SetToolTip(TB_ClipBottom, "아래쪽에서 잘라낼 픽셀 수.");
+            toolTip1.SetToolTip(TB_ClipLeft, "왼쪽에서 잘라낼 픽셀 수.");
+            toolTip1.SetToolTip(TB_ClipRight, "오른쪽에서 잘라낼 픽셀 수.");
+
+            // 코너 라운딩 / 테두리
+            toolTip1.SetToolTip(CB_CornerRounding, "결과 네 모서리를 둥글게 깎고 바깥을 투명하게 만듭니다.");
+            toolTip1.SetToolTip(TB_CornerRounding, "라운딩 반경(짧은 변 대비 %).");
+            toolTip1.SetToolTip(CB_EdgeLine, "카드 가장자리에 검은 테두리 선을 그립니다.");
+
+            // waifu2x
+            toolTip1.SetToolTip(CB_waifu2x, "처리 후 waifu2x로 업스케일/노이즈 제거를 추가로 실행합니다.");
+            toolTip1.SetToolTip(BTN_waifu2x, "waifu2x-ncnn-vulkan.exe 실행 파일 위치를 지정합니다.");
+            toolTip1.SetToolTip(CB_Waifu2xTTA, "TTA 모드: 품질이 조금 오르지만 처리 시간이 크게 늘어납니다.");
+            toolTip1.SetToolTip(RB_WaifuCunet, "CUNet 모델(일반적으로 일러스트/카드에 무난).");
+            toolTip1.SetToolTip(RB_WaifuAnime, "애니메이션 스타일용 모델.");
+            toolTip1.SetToolTip(RB_WaifuPhoto, "사진용 모델.");
+            toolTip1.SetToolTip(RB_WaifuLow, "노이즈 제거 레벨: 낮음.");
+            toolTip1.SetToolTip(RB_WaifuMed, "노이즈 제거 레벨: 중간.");
+            toolTip1.SetToolTip(RB_WaifuHigh, "노이즈 제거 레벨: 높음.");
+            toolTip1.SetToolTip(RB_WaifuHighest, "노이즈 제거 레벨: 최고.");
+
+            // 실행/미리보기
+            toolTip1.SetToolTip(BTN_Execute, "설정한 옵션으로 전체 처리를 시작합니다.");
+            toolTip1.SetToolTip(BTN_Abort, "진행 중인 처리를 중단합니다.");
+            toolTip1.SetToolTip(BTN_ShowPreview, "현재 원본과 옵션으로 한 장을 처리해 미리보기 창에 보여줍니다.");
+        }
+
         // 현재 폼의 모든 보정 옵션을 한 문자열로 직렬화해 사용자 설정에 저장한다.
         private void SaveSettings()
         {
@@ -67,6 +163,7 @@ namespace ScannedCardDenoiser
                 "AdjMode=" + (RB_AutoAdjust.Checked ? "Auto" : RB_ManualAdjust.Checked ? "Manual" : "None"),
                 "AdjThreshold=" + TB_AdjThreshold.Text,
                 // Brightness
+                "BrightnessOn=" + CB_Brightness.Checked,
                 "Brightness=" + TB_Brightness.Value,
                 // Denoise
                 "DenoiseColor=" + CB_DenoiseColor.Checked,
@@ -100,6 +197,7 @@ namespace ScannedCardDenoiser
                 // misc
                 "SubFolder=" + CB_SubFolder.Checked,
                 "Overwrite=" + CB_Overwrite.Checked,
+                "PdfExtract=" + CB_PdfExtract.Checked,
             };
 
             Properties.Settings.Default.Preferences = string.Join("\n", lines);
@@ -148,6 +246,7 @@ namespace ScannedCardDenoiser
                 RB_NoneAdjust.Checked = adjMode == "None";
             }
             setText("AdjThreshold", TB_AdjThreshold);
+            setBool("BrightnessOn", CB_Brightness);
             setTrack("Brightness", TB_Brightness);
             setBool("DenoiseColor", CB_DenoiseColor);
             setText("DenoiseH", TB_DenoiseH);
@@ -190,9 +289,10 @@ namespace ScannedCardDenoiser
 
             setBool("SubFolder", CB_SubFolder);
             setBool("Overwrite", CB_Overwrite);
+            setBool("PdfExtract", CB_PdfExtract);
 
             // 트랙바는 Value를 코드로 바꿔도 Scroll 이벤트가 안 나므로 라벨을 직접 갱신
-            lbl_BrightnessVal.Text = "Brightness : " + TB_Brightness.Value.ToString();
+            lbl_BrightnessVal.Text = TB_Brightness.Value.ToString();
             lbl_SharpenVal.Text = "Sharpen : " + TB_Sharpen.Value.ToString() + "%";
         }
 
@@ -264,6 +364,11 @@ namespace ScannedCardDenoiser
         private void CB_Sharpen_CheckedChanged(object sender, EventArgs e)
         {
             TB_Sharpen.Enabled = CB_Sharpen.Checked;
+        }
+
+        private void CB_Brightness_CheckedChanged(object sender, EventArgs e)
+        {
+            TB_Brightness.Enabled = CB_Brightness.Checked;
         }
 
         private void CB_DenoiseColor_CheckedChanged(object sender, EventArgs e)
@@ -441,15 +546,50 @@ namespace ScannedCardDenoiser
                 files = new string[] { };
             }
 
+            // 원본 위치를 미러링해 출력 폴더(dst)를 구하는 규칙(기존 로직과 동일).
+            Func<string, string> defaultDst = (filepath) =>
+            {
+                string d = TB_Target.Text + filepath.Substring(TB_Source.Text.Length);
+                if (!bSelectedFiles)
+                    d = d.Remove(d.LastIndexOf('\\'));
+                return d;
+            };
+
+            // PDF 확장: .pdf는 페이지별 임베디드 이미지를 원본 폴더에 '페이지번호.png'로 추출하고,
+            // 그 이미지들을 처리 대상으로 삼는다. 각 추출본의 출력 폴더는 원래 PDF 위치를 미러링한다.
+            var workFiles = new List<string>();
+            var dstMap = new Dictionary<string, string>();
+            foreach (string f in files)
+            {
+                if (f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!CB_PdfExtract.Checked)
+                        continue; // 체크 해제 시 PDF는 처리하지 않음
+
+                    string pdfDst = defaultDst(f);
+                    foreach (string img in ExtractPdfImages(f))
+                    {
+                        workFiles.Add(img);
+                        dstMap[img] = pdfDst;
+                    }
+                }
+                else
+                {
+                    workFiles.Add(f);
+                }
+            }
+            files = workFiles.ToArray();
+
+            // 처리 대상별 출력 폴더: PDF 추출본은 매핑값, 그 외에는 기본 규칙.
+            Func<string, string> getDst = (filepath) =>
+                dstMap.TryGetValue(filepath, out string d) ? d : defaultDst(filepath);
+
             if (!CB_Overwrite.Checked)
             {
                 List<string> newFiles = new List<string>();
                 foreach (string filepath in files)
                 {
-                    string dstDirectory = TB_Target.Text + filepath.Substring(TB_Source.Text.Length);
-                    if (!bSelectedFiles)
-                        dstDirectory = dstDirectory.Remove(dstDirectory.LastIndexOf('\\'));
-
+                    string dstDirectory = getDst(filepath);
                     string newFileName = dstDirectory + '\\' + filepath.Split('\\').Last().Split('.')[0] + ".png";
                     if (!File.Exists(newFileName))
                     {
@@ -459,19 +599,7 @@ namespace ScannedCardDenoiser
                 files = newFiles.ToArray();
             }
 
-            // Manual 보정은 파일마다 다이얼로그를 띄우므로 단일 파일에서만 안전하게 사용한다.
-            if (RB_ManualAdjust.Checked && files.Length > 1)
-            {
-                this.Invoke(new Action(() =>
-                {
-                    System.Windows.Forms.MessageBox.Show(
-                        "Manual 보정은 단일 파일에서만 사용할 수 있습니다.\n원본으로 파일 하나만 선택하세요.",
-                        "Manual 모드");
-                    BTN_Execute.Enabled = true;
-                    BTN_Abort.Enabled = false;
-                }));
-                return;
-            }
+            // Manual 보정도 폴더(다중 파일)에서 사용 가능하다. 각 파일마다 순서대로 다이얼로그가 뜬다.
 
             Label_Progress.Invoke(new Action(() =>
             {
@@ -492,9 +620,7 @@ namespace ScannedCardDenoiser
                 if (abortRequested)
                     break;
 
-                string dstDirectory = TB_Target.Text + filepath.Substring(TB_Source.Text.Length);
-                if (!bSelectedFiles)
-                    dstDirectory = dstDirectory.Remove(dstDirectory.LastIndexOf('\\'));
+                string dstDirectory = getDst(filepath);
 
                 if (!Directory.Exists(dstDirectory))
                 {
@@ -528,307 +654,134 @@ namespace ScannedCardDenoiser
             }));
         }
 
+        // PDF의 각 페이지에 들어있는 임베디드 이미지를 추출해 PDF와 같은 폴더에 '페이지번호.png'로 저장한다.
+        // (한 페이지에 이미지가 여러 개면 '페이지번호_순번'). 저장된 파일 경로 목록을 반환한다.
+        private List<string> ExtractPdfImages(string pdfPath)
+        {
+            var saved = new List<string>();
+            string dir = Path.GetDirectoryName(pdfPath);
+
+            try
+            {
+                using (PdfDocument doc = PdfDocument.Open(pdfPath))
+                {
+                    int pageNumber = 0;
+                    foreach (Page page in doc.GetPages())
+                    {
+                        pageNumber++;
+                        var images = page.GetImages().ToList();
+                        int idx = 0;
+                        foreach (IPdfImage img in images)
+                        {
+                            idx++;
+                            string baseName = images.Count > 1 ? (pageNumber + "_" + idx) : pageNumber.ToString();
+
+                            // PdfPig가 색공간을 해석해 PNG로 변환해주면 그대로 사용.
+                            if (img.TryGetPng(out byte[] png) && png != null && png.Length > 0)
+                            {
+                                string outPath = Path.Combine(dir, baseName + ".png");
+                                File.WriteAllBytes(outPath, png);
+                                saved.Add(outPath);
+                            }
+                            else
+                            {
+                                // PNG 변환 실패 시(주로 JPEG/DCT) 원본 스트림 바이트를 그대로 저장 시도.
+                                byte[] raw = img.RawMemory.ToArray();
+                                if (raw == null || raw.Length == 0)
+                                    continue;
+                                string outPath = Path.Combine(dir, baseName + ".jpg");
+                                File.WriteAllBytes(outPath, raw);
+                                saved.Add(outPath);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                this.Invoke(new Action(() =>
+                    System.Windows.Forms.MessageBox.Show(
+                        "PDF 이미지 추출 실패: " + Path.GetFileName(pdfPath) + "\n" + ex.Message,
+                        "PDF")));
+            }
+
+            return saved;
+        }
+
         private Mat Process(string filepath)
         {
             if (!File.Exists(filepath))
                 return null;
 
-            Mat image = null;
-            if (RB_ManualAdjust.Checked)
+            PipelineContext ctx = BuildPipelineContext(filepath);
+
+            // Order: Load -> Denoise -> Brightness -> AutoLevel -> Sharpen -> AreaAdjust -> Resize -> Clip
+            IImageStep[] steps =
             {
-                // 퍼센트 모드는 절대 크기를 지정하지 않고(0) 이후 리사이즈 단계에서 비율로 처리
-                bool bSizeByPixel = CB_ChangeSize.Checked && !RB_ResizePercent.Checked;
-                int desireLong = bSizeByPixel ? Convert.ToInt32(TB_ResizeW.Text) : 0;
-                int desireShort = bSizeByPixel ? Convert.ToInt32(TB_ResizeH.Text) : 0;
+                new LoadStep(),
+                new DenoiseStep(),
+                new BrightnessStep(),
+                new AutoLevelStep(),
+                new SharpenStep(),
+                new AreaAdjustStep(),
+                new ResizeStep(),
+                new ClipStep(),
+            };
 
-                // 다이얼로그는 반드시 UI 스레드에서 띄운다(배치 실행은 백그라운드 스레드이므로 Invoke).
-                Mat manualResult = null;
-                this.Invoke(new Action(() =>
-                {
-                    using (CamScanForm camScanForm = new CamScanForm(filepath, desireLong, desireShort))
-                    {
-                        if (camScanForm.ShowDialog() == DialogResult.OK)
-                        {
-                            manualResult = camScanForm.result;   // 결과 Mat 소유권 이전(복사 불필요)
-                            camScanForm.result = null;
-                        }
-                        else
-                        {
-                            camScanForm.result?.Dispose(); // 취소 시 로드한 원본 해제
-                        }
-                    }
-                }));
-                image = manualResult;
-            }
-            else
+            Mat cur = null;
+            foreach (IImageStep step in steps)
             {
-                image = Cv2.ImRead(filepath);
+                Mat next = step.Apply(cur, ctx);
+                if (next != cur && cur != null)
+                    cur.Dispose();
+                cur = next;
+                if (cur == null)
+                    return null;
             }
-            
-            if (image == null)
-                return null;
+            return cur;
+        }
 
-            Cv2.CvtColor(image, image, ColorConversionCodes.RGB2RGBA);
-            OpenCvSharp.Size imageSize = new OpenCvSharp.Size(image.Cols, image.Rows);
-
-            if (RB_AutoAdjust.Checked)
-            {                
-                // 카드 테두리(상/하/좌/우 4변) 에지점에 로버스트 직선 피팅(Huber)을 적용해
-                // 기울기를 산출하고 그만큼 회전 보정한다. 어두운 배경 카드에서도 안정적이다.
-                Cv2.CvtColor(image, image, ColorConversionCodes.RGBA2RGB);
-#if DEBUG
-                string newFileName = filepath.Split('\\').Last().Split('.')[0];
-#endif
-                double rotAngle = ComputeDeskewAngle(image);
-                if (rotAngle != 0)
-                {
-                    Mat RotMat = Cv2.GetRotationMatrix2D(new Point2f(imageSize.Width * 0.5f, imageSize.Height * 0.5f), rotAngle, 1.0);
-                    Cv2.WarpAffine(image, image, RotMat, new OpenCvSharp.Size(imageSize.Width, imageSize.Height), InterpolationFlags.Linear, BorderTypes.Replicate);
-                    RotMat.Dispose();
-                }
-
-                int Top = imageSize.Height; int Bottom = 0; int Left = imageSize.Width; int Right = 0;
-
-                int W = imageSize.Width;
-                int H = imageSize.Height;
-
-                // 비닐 슬리브의 빛 산란으로 카드 주위에 밝은 헤일로가 생긴다. 에지가 아니라 밝기로 판단해
-                // 밝은 비닐/배경을 지나 '어두운 실제 카드'가 시작하는 경계를 찾는다(Otsu로 카드=255 마스크).
-                Mat gray = new Mat();
-                Mat darkMask = new Mat();
-                Cv2.CvtColor(image, gray, ColorConversionCodes.RGB2GRAY);
-                Cv2.GaussianBlur(gray, gray, new OpenCvSharp.Size(5, 5), 0);
-                Cv2.Threshold(gray, darkMask, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
-                gray.Dispose();
-
-                // 각 행/열에서 처음/마지막으로 '어두워지는'(카드 영역 시작) 위치를 히스토그램으로 모은다
-                int[] leftHist = new int[W];
-                int[] rightHist = new int[W];
-                int[] topHist = new int[H];
-                int[] bottomHist = new int[H];
-
-                unsafe
-                {
-                    byte* data = (byte*)darkMask.Data.ToPointer();
-
-                    // 행별: 처음/마지막으로 어두워지는 열 (좌/우 경계 후보)
-                    for (int y = 0; y < H; ++y)
-                    {
-                        byte* row = data + y * W;
-                        int l = -1;
-                        for (int x = 0; x < W; ++x) if (row[x] != 0) { l = x; break; }
-                        if (l < 0)
-                            continue;
-                        int r = W - 1;
-                        for (int x = W - 1; x >= 0; --x) if (row[x] != 0) { r = x; break; }
-                        leftHist[l]++;
-                        rightHist[r]++;
-                    }
-
-                    // 열별: 처음/마지막으로 어두워지는 행 (상/하 경계 후보)
-                    for (int x = 0; x < W; ++x)
-                    {
-                        int t = -1;
-                        for (int y = 0; y < H; ++y) if (data[y * W + x] != 0) { t = y; break; }
-                        if (t < 0)
-                            continue;
-                        int b = H - 1;
-                        for (int y = H - 1; y >= 0; --y) if (data[y * W + x] != 0) { b = y; break; }
-                        topHist[t]++;
-                        bottomHist[b]++;
-                    }
-                }
-                darkMask.Dispose();
-
-                // 비닐 헤일로 안쪽에서 '어두운 카드'가 지배적으로 시작하는 위치를 경계로 삼는다.
-                Left = FindDominantBound(leftHist, true, W);
-                Right = FindDominantBound(rightHist, false, 0);
-                Top = FindDominantBound(topHist, true, H);
-                Bottom = FindDominantBound(bottomHist, false, 0);
-
-#if DEBUG
-                Mat RectImage = new Mat();
-                Cv2.CopyTo(image, RectImage);
-
-                RectImage.Rectangle(new OpenCvSharp.Point(Left, Top), new OpenCvSharp.Point(Right, Bottom), new Scalar(255, 0, 255), 3);
-
-                Cv2.ImShow("Rect", RectImage);
-                Cv2.WaitKey(0);
-
-                Cv2.ImWrite(Path.Combine(Environment.CurrentDirectory, newFileName + "_Rect.png"), RectImage);
-                RectImage.Dispose();
-#endif
-
-                // 어두운 카드 영역을 못 찾으면(빈/단색 이미지) 크롭하지 않고 원본 유지
-                if (Right > Left && Bottom > Top)
-                {
-                    Mat cropped = image.GetRectSubPix(new OpenCvSharp.Size(Right - Left, Bottom - Top), new OpenCvSharp.Point((Right + Left) * 0.5f, (Bottom + Top) * 0.5f));
-                    image.Dispose();
-                    image = cropped;
-                }
-
-                Cv2.CvtColor(image, image, ColorConversionCodes.RGB2RGBA);
-                imageSize = new OpenCvSharp.Size(image.Cols, image.Rows);
-            }
-            
-            bool bHorizontal = imageSize.Width > imageSize.Height;
-
-            int X, Y;
-            if (CB_ChangeSize.Checked && RB_ResizePercent.Checked)
+        // Snapshot the form control values the pipeline steps need.
+        private PipelineContext BuildPipelineContext(string filepath)
+        {
+            return new PipelineContext
             {
-                // 퍼센트 모드: 원본(보정/크롭 후) 크기의 비율로 축소/확대
-                double pct = Convert.ToInt32(TB_ResizePercent.Text) * 0.01;
-                X = (int)Math.Round(imageSize.Width * pct);
-                Y = (int)Math.Round(imageSize.Height * pct);
-            }
-            else
-            {
-                X = CB_ChangeSize.Checked ? (bHorizontal ? Convert.ToInt32(TB_ResizeW.Text) : Convert.ToInt32(TB_ResizeH.Text)) : imageSize.Width;
-                Y = CB_ChangeSize.Checked ? (bHorizontal ? Convert.ToInt32(TB_ResizeH.Text) : Convert.ToInt32(TB_ResizeW.Text)) : imageSize.Height;
-            }
+                Form = this,
+                FilePath = filepath,
+                Manual = RB_ManualAdjust.Checked,
+                Auto = RB_AutoAdjust.Checked,
+                AdjThresholdOffset = ParseInt(TB_AdjThreshold.Text),
+                ChangeSize = CB_ChangeSize.Checked,
+                ResizePercent = RB_ResizePercent.Checked,
+                ResizeW = ParseInt(TB_ResizeW.Text),
+                ResizeH = ParseInt(TB_ResizeH.Text),
+                ResizePct = ParseInt(TB_ResizePercent.Text),
+                ClipTop = CB_Clip.Checked ? ParseInt(TB_ClipTop.Text) : 0,
+                ClipBottom = CB_Clip.Checked ? ParseInt(TB_ClipBottom.Text) : 0,
+                ClipLeft = CB_Clip.Checked ? ParseInt(TB_ClipLeft.Text) : 0,
+                ClipRight = CB_Clip.Checked ? ParseInt(TB_ClipRight.Text) : 0,
+                CornerRounding = CB_CornerRounding.Checked,
+                CornerPercent = ParseInt(TB_CornerRounding.Text),
+                EdgeLine = CB_EdgeLine.Checked,
+                BrightnessEnabled = CB_Brightness.Checked,
+                Brightness = TB_Brightness.Value,
+                Denoise = CB_DenoiseColor.Checked,
+                DenoiseH = ParseInt(TB_DenoiseH.Text),
+                DenoiseHColor = ParseInt(TB_DenoiseHColor.Text),
+                DenoiseT = ParseInt(TB_DenoiseTSize.Text),
+                DenoiseS = ParseInt(TB_DenoiseSSize.Text),
+                AutoLevel = CB_AutoLevel.Checked,
+                AutoLevelMin = ParseInt(TB_AutoLevelMin.Text),
+                AutoLevelMax = ParseInt(TB_AutoLevelMax.Text),
+                Sharpen = CB_Sharpen.Checked,
+                SharpenAmount = TB_Sharpen.Value,
+            };
+        }
 
-            if (X * Y == 0)
-                return null;
-
-            if (X * Y > 268435456)
-                return null;
-
-            OpenCvSharp.Size size = new OpenCvSharp.Size(X, Y);
-
-            int ClipTop = 0, ClipBottom = 0, ClipLeft = 0, ClipRight = 0;
-            if (CB_Clip.Checked)
-            {
-                ClipTop = Convert.ToInt32(TB_ClipTop.Text);
-                ClipBottom = Convert.ToInt32(TB_ClipBottom.Text);
-                ClipLeft = Convert.ToInt32(TB_ClipLeft.Text);
-                ClipRight = Convert.ToInt32(TB_ClipRight.Text);
-            }
-
-            int circleRadius = 0;
-            if (CB_CornerRounding.Checked)
-            {
-                circleRadius = (int)((double)(bHorizontal ? size.Width : size.Height) * 0.01 * Convert.ToInt32(TB_CornerRounding.Text));
-            }
-
-            size.Width += ClipLeft + ClipRight;
-            size.Height += ClipTop + ClipBottom;
-
-            // 밝기 조정(톤 단계). 알파(4번째 채널)는 0으로 두어 변경하지 않는다.
-            int brightness = TB_Brightness.Value;
-            if (brightness > 0)
-                Cv2.Add(image, new Scalar(brightness, brightness, brightness, 0), image);
-            else if (brightness < 0)
-                Cv2.Subtract(image, new Scalar(-brightness, -brightness, -brightness, 0), image);
-
-            // 컬러 노이즈 제거
-            Mat After = new Mat();
-            if (CB_DenoiseColor.Checked)
-            {
-                Cv2.FastNlMeansDenoisingColored(
-                    image,
-                    After,
-                    Convert.ToInt32(TB_DenoiseH.Text),
-                    Convert.ToInt32(TB_DenoiseHColor.Text),
-                    Convert.ToInt32(TB_DenoiseTSize.Text),
-                    Convert.ToInt32(TB_DenoiseSSize.Text)
-                );
-            }
-            else
-            {
-                Cv2.CopyTo(image, After);
-            }
-
-            // 오토 레벨
-            Mat AutoLevelSrc = new Mat();
-            if (CB_AutoLevel.Checked)
-            {
-                AutoLevelSrc = AutoLevel(After, Convert.ToInt32(TB_AutoLevelMin.Text), Convert.ToInt32(TB_AutoLevelMax.Text));
-            }
-            else
-            {
-                Cv2.CopyTo(After, AutoLevelSrc);
-            }
-
-            // 샤프닝(언샤프 마스크). 오토 레벨 결과에 적용한다. 가우시안 블러로 만든 저주파를 빼서
-            // 에지를 강조한다. Amount(%)가 클수록 강해진다. 알파(4번째 채널)는 균일(255)하므로 영향 없음.
-            if (CB_Sharpen.Checked && TB_Sharpen.Value > 0)
-            {
-                double amount = TB_Sharpen.Value / 100.0;
-                using (Mat blurred = new Mat())
-                {
-                    Cv2.GaussianBlur(AutoLevelSrc, blurred, new OpenCvSharp.Size(0, 0), 3);
-                    Cv2.AddWeighted(AutoLevelSrc, 1.0 + amount, blurred, -amount, 0, AutoLevelSrc);
-                }
-            }
-
-            // 리사이즈(마지막 단계). 톤 보정을 마친 원본 해상도 이미지를 목표 크기로 줄인다.
-            Mat Original = new Mat();
-            Cv2.Resize(AutoLevelSrc, Original, size);
-
-            OpenCvSharp.Size ResultSize = new OpenCvSharp.Size(size.Width - ClipLeft - ClipRight, size.Height - ClipTop - ClipBottom);
-            Mat Result = new Mat(ResultSize, MatType.CV_8UC4);
-
-            IntPtr pSrcBitmap = Original.Data;
-            IntPtr pDstBitmap = Result.Data;
-
-            bool bCornerRounding = CB_CornerRounding.Checked;
-            bool bEdgeLine = CB_EdgeLine.Checked;
-
-            for (int i = 0, j = 0; i < size.Width * size.Height; ++i)
-            {
-                int HeightIdx = i / size.Width;
-                int WidthIdx = i % size.Width;
-                if (HeightIdx < ClipTop || HeightIdx > (size.Height - ClipBottom - 1) || WidthIdx < ClipLeft || WidthIdx > (size.Width - ClipRight - 1))
-                    continue;
-
-                unsafe
-                {
-                    IntPtr currentSrcPixel = IntPtr.Add(pSrcBitmap, i * 4);
-                    IntPtr currentDstPixel = IntPtr.Add(pDstBitmap, j++ * 4);
-
-                    uint* pSrcPixel = (uint*)currentSrcPixel.ToPointer();
-                    uint* pDstPixel = (uint*)currentDstPixel.ToPointer();
-
-                    if (bCornerRounding && IsOutside(WidthIdx, HeightIdx, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius))
-                    {
-                        *pDstPixel = 0x00000000;
-
-                        if (bEdgeLine)
-                        {
-                            if (!IsOutside(WidthIdx - 1, HeightIdx, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius) ||
-                            !IsOutside(WidthIdx + 1, HeightIdx, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius) ||
-                            !IsOutside(WidthIdx, HeightIdx - 1, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius) ||
-                            !IsOutside(WidthIdx, HeightIdx + 1, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius))
-                            {
-                                *pDstPixel = 0xff000000;
-                            }
-                            else if (!IsOutside(WidthIdx - 1, HeightIdx - 1, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius) ||
-                                !IsOutside(WidthIdx - 1, HeightIdx + 1, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius) ||
-                                !IsOutside(WidthIdx + 1, HeightIdx - 1, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius) ||
-                                !IsOutside(WidthIdx + 1, HeightIdx + 1, size, ClipTop, ClipBottom, ClipLeft, ClipRight, circleRadius))
-                            {
-                                *pDstPixel = 0xff000000;
-                            }
-                        }
-                    }
-                    else if (bEdgeLine && ((HeightIdx == ClipTop || HeightIdx == (size.Height - ClipBottom - 1) || WidthIdx == ClipLeft || WidthIdx == (size.Width - ClipRight - 1))))
-                    {
-                        *pDstPixel = 0xff000000;
-                    }
-                    else
-                    {
-                        uint temp = Original.At<uint>(HeightIdx, WidthIdx);
-                        *pDstPixel = temp | 0xff000000;
-                    }
-                }
-            }
-
-            image.Dispose();
-            After.Dispose();
-            Original.Dispose();
-            AutoLevelSrc.Dispose();
-
-            return Result;
+        private static int ParseInt(string s)
+        {
+            int.TryParse(s, out int v);
+            return v;
         }
 
         private void Process(string filepath, string dstDirectory)
@@ -914,293 +867,6 @@ namespace ScannedCardDenoiser
             Result.Dispose();
         }
 
-        private void GetMinMaxHist(ref Mat Hist, int totalPixel, double LowCut, double HighCut, out int Min, out int Max)
-        {
-            Min = 0;
-            Max = 0;
-
-            float sum = 0;
-            for (int i = 0; i < 256; i++)
-            {
-                sum += Hist.At<float>(i);
-                if (sum >= totalPixel * LowCut * 0.01)
-                {
-                    Min = i;
-                    break;
-                }
-            }
-
-            sum = 0;
-            for (int i = 255; i >= 0; i--)
-            {
-                sum = sum + Hist.At<float>(i);
-                if (sum >= totalPixel * HighCut * 0.01)
-                {
-                    Max = i;
-                    break;
-                }
-            }
-        }
-
-        private void AutoLevelChannelLUT(out byte TableValue, int IndexValue, int Min, int Max)
-        {
-            if (IndexValue < Min)
-            {
-                TableValue = 0;
-            }
-            else
-            {
-                if (IndexValue > Max || Max == Min)
-                {
-                    TableValue = 255;
-                }
-                else
-                {
-                    float temp = (float)(IndexValue - Min) / (Max - Min);
-                    TableValue = (byte)(temp * 255);
-                }
-            }
-        }
-
-        private Mat AutoLevel(Mat src, double LowCut, double HighCut)
-        {     
-            int rows = src.Rows;
-            int cols = src.Cols;
-            int totalPixel = rows * cols;
-
-            byte[] Pixel = new byte[256 * 4];
-
-            Mat[] rgb;
-            Cv2.Split(src, out rgb);
-            Mat HistBlue = new Mat();
-            Mat HistGreen = new Mat();
-            Mat HistRed = new Mat();
-
-            int[] hdims = { 256 };
-            Rangef[] ranges = { new Rangef(0, 255) };
-
-            CLAHE clahe = Cv2.CreateCLAHE();
-            clahe.Apply(rgb[2], rgb[2]);
-            clahe.Apply(rgb[1], rgb[1]);
-            clahe.Apply(rgb[0], rgb[0]);
-
-            Cv2.CalcHist(new Mat[] { rgb[2] }, new int[] { 0 }, null, HistRed, 1, hdims, ranges);
-            Cv2.CalcHist(new Mat[] { rgb[1] }, new int[] { 0 }, null, HistGreen, 1, hdims, ranges);
-            Cv2.CalcHist(new Mat[] { rgb[0] }, new int[] { 0 }, null, HistBlue, 1, hdims, ranges);
-
-            int MinBlue = 0, MaxBlue = 255;            
-            int MinGreen = 0, MaxGreen = 255;
-            int MinRed = 0, MaxRed = 255;
-
-            //Blue Channel
-            GetMinMaxHist(ref HistBlue, totalPixel, LowCut, HighCut, out MinBlue, out MaxBlue);
-            //Green channel
-            GetMinMaxHist(ref HistGreen, totalPixel, LowCut, HighCut, out MinGreen, out MaxGreen);
-            //Red channel
-            GetMinMaxHist(ref HistRed, totalPixel, LowCut, HighCut, out MinRed, out MaxRed);
-
-            for (int i = 0; i < 256; i++)
-            {
-                int PixelIndexBase = i * 4;
-                Pixel[PixelIndexBase + 3] = 255;
-
-                AutoLevelChannelLUT(out Pixel[PixelIndexBase + 2], i, MinBlue, MaxBlue);
-                AutoLevelChannelLUT(out Pixel[PixelIndexBase + 1], i, MinGreen, MaxGreen);
-                AutoLevelChannelLUT(out Pixel[PixelIndexBase + 0], i, MinRed, MaxRed);
-            }
-
-            Mat dst = new Mat();
-            Mat TMP = Mat.FromPixelData(1, 256, MatType.CV_8UC4, Pixel);
-
-            Cv2.LUT(src, TMP, dst);
-
-            rgb[0].Dispose();
-            rgb[1].Dispose();
-            rgb[2].Dispose();
-            HistBlue.Dispose();
-            HistGreen.Dispose();
-            HistRed.Dispose();
-            TMP.Dispose();
-            clahe.Dispose();
-
-            return dst;
-        }
-
-        // 카드 테두리 4변의 에지점에 로버스트 직선 피팅을 적용해 기울기(도)를 구한다.
-        // 반환값은 보정각(=GetRotationMatrix2D에 그대로 넣어 회전하면 수평이 됨). 실패 시 0.
-        private unsafe double ComputeDeskewAngle(Mat rgb)
-        {
-            int W = rgb.Cols, H = rgb.Rows;
-
-            // 채널별 Canny 에지를 OR로 합쳐 에지 마스크 생성 (여백 검출과 동일)
-            Mat[] chans;
-            Cv2.Split(rgb, out chans);
-            Mat edge = new Mat(new OpenCvSharp.Size(W, H), MatType.CV_8UC1, Scalar.All(0));
-            foreach (Mat c in chans)
-            {
-                Cv2.GaussianBlur(c, c, new OpenCvSharp.Size(5, 5), 0);
-                Cv2.Canny(c, c, 100, 200);
-                Cv2.Threshold(c, c, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
-                Cv2.BitwiseOr(edge, c, edge);
-                c.Dispose();
-            }
-
-            byte* d = (byte*)edge.Data.ToPointer();
-
-            // 강건 경계(L/T/R/B) — 여백 검출과 동일 방식
-            int[] lh = new int[W], rh = new int[W], th = new int[H], bh = new int[H];
-            for (int y = 0; y < H; ++y)
-            {
-                int l = -1; for (int x = 0; x < W; ++x) if (d[y * W + x] != 0) { l = x; break; }
-                if (l < 0) continue;
-                int r = W - 1; for (int x = W - 1; x >= 0; --x) if (d[y * W + x] != 0) { r = x; break; }
-                lh[l]++; rh[r]++;
-            }
-            for (int x = 0; x < W; ++x)
-            {
-                int t = -1; for (int y = 0; y < H; ++y) if (d[y * W + x] != 0) { t = y; break; }
-                if (t < 0) continue;
-                int b = H - 1; for (int y = H - 1; y >= 0; --y) if (d[y * W + x] != 0) { b = y; break; }
-                th[t]++; bh[b]++;
-            }
-            int rs = Math.Max(5, H / 100), cs = Math.Max(5, W / 100);
-            int L = FindRobustBound(lh, true, rs, W), R = FindRobustBound(rh, false, rs, 0);
-            int T = FindRobustBound(th, true, cs, H), B = FindRobustBound(bh, false, cs, 0);
-            if (!(R > L && B > T)) { edge.Dispose(); return 0; }
-
-            // 4변의 경계점 수집 (둥근 모서리 제외, 경계 근처 밴드만)
-            int cw = R - L, chh = B - T;
-            int skipH = (int)(cw * 0.12), skipV = (int)(chh * 0.12);
-            int bandH = Math.Max(25, chh / 8), bandV = Math.Max(25, cw / 8);
-            var top = new List<Point2f>(); var bot = new List<Point2f>();
-            var lft = new List<Point2f>(); var rgt = new List<Point2f>();
-            for (int x = L + skipH; x <= R - skipH; x += 3)
-            {
-                for (int y = 0; y < H; ++y) if (d[y * W + x] != 0) { if (y <= T + bandH) top.Add(new Point2f(x, y)); break; }
-                for (int y = H - 1; y >= 0; --y) if (d[y * W + x] != 0) { if (y >= B - bandH) bot.Add(new Point2f(x, y)); break; }
-            }
-            for (int y = T + skipV; y <= B - skipV; y += 3)
-            {
-                for (int x = 0; x < W; ++x) if (d[y * W + x] != 0) { if (x <= L + bandV) lft.Add(new Point2f(x, y)); break; }
-                for (int x = W - 1; x >= 0; --x) if (d[y * W + x] != 0) { if (x >= R - bandV) rgt.Add(new Point2f(x, y)); break; }
-            }
-            edge.Dispose();
-
-            // 각 변의 기울기를 모아 중앙값을 취한다 (이상치 변 배제)
-            List<double> angles = new List<double>();
-            AddEdgeAngle(top, true, angles);
-            AddEdgeAngle(bot, true, angles);
-            AddEdgeAngle(lft, false, angles);
-            AddEdgeAngle(rgt, false, angles);
-            if (angles.Count == 0)
-                return 0;
-            angles.Sort();
-            int m = angles.Count;
-            double median = (m % 2 == 1) ? angles[m / 2] : (angles[m / 2 - 1] + angles[m / 2]) / 2;
-            return median;
-        }
-
-        // 한 변의 에지점에 Huber FitLine을 적용해 기울기(도)를 angles에 추가.
-        // horizontal=true: 상/하변(수평), false: 좌/우변(수직). 부호는 보정각 기준으로 통일.
-        private void AddEdgeAngle(List<Point2f> pts, bool horizontal, List<double> angles)
-        {
-            if (pts.Count < 30)
-                return;
-            Line2D ln = Cv2.FitLine(pts, DistanceTypes.Huber, 0, 0.01, 0.01);
-            double vx = ln.Vx, vy = ln.Vy;
-            double a;
-            if (horizontal)
-            {
-                if (vx < 0) { vx = -vx; vy = -vy; }
-                a = Math.Atan2(vy, vx) * 180 / Math.PI;
-            }
-            else
-            {
-                if (vy < 0) { vx = -vx; vy = -vy; }
-                a = Math.Atan2(vy, vx) * 180 / Math.PI - 90;
-            }
-            if (Math.Abs(a) < 20)
-                angles.Add(a);
-        }
-
-        // 히스토그램 피크의 일정 비율(25%) 이상인 첫 위치를 경계로 반환(지배적 에지 탐지).
-        // 카드 바깥의 옅은 에지는 피크 대비 작아 건너뛴다. 에지가 없으면 fallback 반환.
-        // 카드 경계 탐지: ① 최외곽 에지(누적 소임계) B1 → ② B1에서 여백창(치수의 8%) 안의
-        // 최강 에지 위치 Pm → ③ Pm 클러스터(Pm 지지의 40% 이상)의 바깥 끝을 경계로.
-        // 카드 바로 위의 스캐너 띠는 창 안의 더 강한 카드 에지로 보정되고, 멀리 떨어진 반대편
-        // 흔적은 창 밖이라 무시되어 과크롭(폭/높이 붕괴) 없이 흰 여백을 제거한다.
-        private int FindDominantBound(int[] hist, bool fromStart, int fallback)
-        {
-            int len = hist.Length;
-            int smallThr = Math.Max(5, len / 100);
-
-            // ① 최외곽 에지
-            int B1 = -1, csum = 0;
-            if (fromStart)
-            {
-                for (int i = 0; i < len; ++i) { csum += hist[i]; if (csum >= smallThr) { B1 = i; break; } }
-            }
-            else
-            {
-                for (int i = len - 1; i >= 0; --i) { csum += hist[i]; if (csum >= smallThr) { B1 = i; break; } }
-            }
-            if (B1 < 0)
-                return fallback;
-
-            // ② 여백창 안의 최강 위치
-            int maxMargin = Math.Max(40, (int)(len * 0.08));
-            int Pm = B1, pmVal = 0;
-            if (fromStart)
-            {
-                for (int i = B1; i <= Math.Min(len - 1, B1 + maxMargin); ++i) if (hist[i] > pmVal) { pmVal = hist[i]; Pm = i; }
-            }
-            else
-            {
-                for (int i = B1; i >= Math.Max(0, B1 - maxMargin); --i) if (hist[i] > pmVal) { pmVal = hist[i]; Pm = i; }
-            }
-
-            // ③ Pm 클러스터의 바깥 끝
-            int clusterThr = Math.Max(8, (int)(pmVal * 0.4));
-            int b = Pm;
-            if (fromStart) { while (b - 1 >= 0 && hist[b - 1] >= clusterThr) b--; }
-            else { while (b + 1 < len && hist[b + 1] >= clusterThr) b++; }
-            return b;
-        }
-
-        // 최외곽 에지 위치 히스토그램을 한쪽 끝에서 누적하여 임계값을 처음 넘는 인덱스를 경계로 반환.
-        // 임계값에 못 미치면(에지 없음) fallback을 반환해 크롭이 일어나지 않게 한다.
-        private int FindRobustBound(int[] hist, bool fromStart, int threshold, int fallback)
-        {
-            int sum = 0;
-            if (fromStart)
-            {
-                for (int i = 0; i < hist.Length; ++i)
-                {
-                    sum += hist[i];
-                    if (sum >= threshold)
-                        return i;
-                }
-            }
-            else
-            {
-                for (int i = hist.Length - 1; i >= 0; --i)
-                {
-                    sum += hist[i];
-                    if (sum >= threshold)
-                        return i;
-                }
-            }
-            return fallback;
-        }
-
-        private bool IsOutside(int WidthIdx, int HeightIdx, OpenCvSharp.Size size, int ClipTop, int ClipBottom, int ClipLeft, int ClipRight, int circleRadius)
-        {
-            return (WidthIdx < circleRadius && HeightIdx < circleRadius && Math.Sqrt((WidthIdx - circleRadius - ClipLeft) * (WidthIdx - circleRadius - ClipLeft) + (HeightIdx - circleRadius - ClipTop) * (HeightIdx - circleRadius - ClipTop)) > circleRadius) ||
-                         (WidthIdx > size.Width - circleRadius && HeightIdx < circleRadius && Math.Sqrt((WidthIdx - size.Width + circleRadius + ClipRight) * (WidthIdx - size.Width + circleRadius + ClipRight) + (HeightIdx - circleRadius - ClipTop) * (HeightIdx - circleRadius - ClipTop)) > circleRadius) ||
-                         (WidthIdx < circleRadius && HeightIdx > size.Height - circleRadius && Math.Sqrt((WidthIdx - circleRadius - ClipLeft) * (WidthIdx - circleRadius - ClipLeft) + (HeightIdx - size.Height + circleRadius + ClipBottom) * (HeightIdx - size.Height + circleRadius + ClipBottom)) > circleRadius) ||
-                         (WidthIdx > size.Width - circleRadius && HeightIdx > size.Height - circleRadius && Math.Sqrt((WidthIdx - size.Width + circleRadius + ClipRight) * (WidthIdx - size.Width + circleRadius + ClipRight) + (HeightIdx - size.Height + circleRadius + ClipBottom) * (HeightIdx - size.Height + circleRadius + ClipBottom)) > circleRadius);
-        }
-
         private void UpdatePreviewButton()
         {
             BTN_ShowPreview.Enabled = false;
@@ -1243,7 +909,7 @@ namespace ScannedCardDenoiser
             {
                 Title += "[AutoAdjust:" + TB_AdjThreshold.Text + "]";
             }
-            if (TB_Brightness.Value != 0)
+            if (CB_Brightness.Checked && TB_Brightness.Value != 0)
             {
                 Title += "[Brightness:" + TB_Brightness.Value + "]";
             }
@@ -1350,11 +1016,14 @@ namespace ScannedCardDenoiser
                 ps.Dispose();
             }
 
+            // 원본(좌)과 결과(우)를 각각 별도 창으로 띄우고, 화면 작업영역을 좌/우로 나눠 나란히 배치한다.
+            System.Drawing.Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+            int halfW = wa.Width / 2;
             using (Mat original = Cv2.ImRead(TB_Source.Text))
             {
-                ShowPreviewWindow("Original", original);
+                ShowPreviewWindow("Original (Before)", original, new System.Drawing.Rectangle(wa.Left, wa.Top, halfW, wa.Height));
             }
-            ShowPreviewWindow(Title, tmpImage);
+            ShowPreviewWindow("Result (After)  " + Title, tmpImage, new System.Drawing.Rectangle(wa.Left + halfW, wa.Top, wa.Width - halfW, wa.Height));
             tmpImage.Dispose();
         }
 
@@ -1418,12 +1087,13 @@ namespace ScannedCardDenoiser
 
         private void RB_AutoAdjust_CheckedChanged(object sender, EventArgs e)
         {
-            TB_AdjThreshold.Enabled = RB_AutoAdjust.Checked;
+            // Threshold는 Auto 크롭과 Manual 초기 4포인트 검출에 모두 쓰이므로 두 모드에서 활성화.
+            TB_AdjThreshold.Enabled = RB_AutoAdjust.Checked || RB_ManualAdjust.Checked;
         }
 
         private void TB_Brightness_Scroll(object sender, EventArgs e)
         {
-            lbl_BrightnessVal.Text = "Brightness : " + TB_Brightness.Value.ToString();
+            lbl_BrightnessVal.Text = TB_Brightness.Value.ToString();
         }
 
         private void TB_Sharpen_Scroll(object sender, EventArgs e)
@@ -1434,6 +1104,12 @@ namespace ScannedCardDenoiser
         // Mat을 확대 슬라이더가 있는 프리뷰 창으로 표시(큰 이미지는 창에 맞게 축소).
         private void ShowPreviewWindow(string title, Mat mat)
         {
+            ShowPreviewWindow(title, mat, System.Drawing.Rectangle.Empty);
+        }
+
+        // bounds가 비어있지 않으면 그 위치/크기로 창을 배치한다(좌/우 나란히 비교용).
+        private void ShowPreviewWindow(string title, Mat mat, System.Drawing.Rectangle bounds)
+        {
             byte[] buf;
             Cv2.ImEncode(".png", mat, out buf);
             Bitmap bmp;
@@ -1441,6 +1117,11 @@ namespace ScannedCardDenoiser
             using (Bitmap tmp = new Bitmap(ms))
                 bmp = new Bitmap(tmp);
             PreviewForm pf = new PreviewForm(title, bmp);
+            if (bounds != System.Drawing.Rectangle.Empty)
+            {
+                pf.StartPosition = FormStartPosition.Manual;
+                pf.Bounds = bounds;
+            }
             pf.Show();
         }
     }

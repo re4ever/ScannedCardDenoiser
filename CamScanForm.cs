@@ -13,8 +13,12 @@ namespace ScannedCardDenoiser
         public System.Drawing.Point min { get; set; }
         public System.Drawing.Point max { get; set; }
 
-        public CamScanForm(string filepath, int desireLong, int desireShort)
+        // 초기 4포인트 검출 시 사용하는 Otsu 오프셋(Threshold 컨트롤 값). Auto와 동일한 의미.
+        private readonly int adjThresholdOffset;
+
+        public CamScanForm(string filepath, int desireLong, int desireShort, int adjThresholdOffset = 0)
         {
+            this.adjThresholdOffset = adjThresholdOffset;
             result = Cv2.ImRead(filepath);
             InitializeComponent();
 
@@ -55,20 +59,19 @@ namespace ScannedCardDenoiser
             basePoint.X -= TopLeft.Size.Width / 2;
             basePoint.Y -= TopLeft.Size.Height / 2;
 
-            // 자동 검출한 카드 영역을 초기 포인트 위치로 사용(실패 시 전체 이미지). (표시 좌표 기준)
-            int dL, dT, dR, dB;
-            DetectCardBox(out dL, out dT, out dR, out dB);
+            // Auto 검출(기울기 deskew 포함)한 카드 4모서리를 초기 포인트 위치로 사용(실패 시 전체 이미지). (표시 좌표 기준)
+            System.Drawing.PointF qTL, qTR, qBL, qBR;
+            DetectCardQuad(out qTL, out qTR, out qBL, out qBR);
 
-            TopLeft.Location = new System.Drawing.Point(basePoint.X + dL, basePoint.Y + dT);
-            TopRight.Location = new System.Drawing.Point(basePoint.X + dR, basePoint.Y + dT);
-            TopCenter.Location = new System.Drawing.Point(basePoint.X + (dL + dR) / 2, basePoint.Y + dT);
+            TopLeft.Location = new System.Drawing.Point(basePoint.X + (int)Math.Round(qTL.X), basePoint.Y + (int)Math.Round(qTL.Y));
+            TopRight.Location = new System.Drawing.Point(basePoint.X + (int)Math.Round(qTR.X), basePoint.Y + (int)Math.Round(qTR.Y));
+            BottomLeft.Location = new System.Drawing.Point(basePoint.X + (int)Math.Round(qBL.X), basePoint.Y + (int)Math.Round(qBL.Y));
+            BottomRight.Location = new System.Drawing.Point(basePoint.X + (int)Math.Round(qBR.X), basePoint.Y + (int)Math.Round(qBR.Y));
 
-            BottomLeft.Location = new System.Drawing.Point(basePoint.X + dL, basePoint.Y + dB);
-            BottomRight.Location = new System.Drawing.Point(basePoint.X + dR, basePoint.Y + dB);
-            BottomCenter.Location = new System.Drawing.Point(basePoint.X + (dL + dR) / 2, basePoint.Y + dB);
-
-            CenterLeft.Location = new System.Drawing.Point(basePoint.X + dL, basePoint.Y + (dT + dB) / 2);
-            CenterRight.Location = new System.Drawing.Point(basePoint.X + dR, basePoint.Y + (dT + dB) / 2);
+            TopCenter.Location = new System.Drawing.Point((TopLeft.Location.X + TopRight.Location.X) / 2, (TopLeft.Location.Y + TopRight.Location.Y) / 2);
+            BottomCenter.Location = new System.Drawing.Point((BottomLeft.Location.X + BottomRight.Location.X) / 2, (BottomLeft.Location.Y + BottomRight.Location.Y) / 2);
+            CenterLeft.Location = new System.Drawing.Point((TopLeft.Location.X + BottomLeft.Location.X) / 2, (TopLeft.Location.Y + BottomLeft.Location.Y) / 2);
+            CenterRight.Location = new System.Drawing.Point((TopRight.Location.X + BottomRight.Location.X) / 2, (TopRight.Location.Y + BottomRight.Location.Y) / 2);
 
             // 포인트 컨트롤은 숨기고(투명 박스 잔상 제거) PIC_Main 위에 마커를 직접 그린다.
             // 드래그/히트테스트도 PIC_Main에서 처리한다.
@@ -84,67 +87,37 @@ namespace ScannedCardDenoiser
         System.Drawing.Point GetBasePoint()
         {
             System.Drawing.Point basePoint = new System.Drawing.Point(PIC_Main.Location.X, PIC_Main.Location.Y);
-            basePoint.X += (640 - PIC_Main.Image.Size.Width) / 2;
-            basePoint.Y += (640 - PIC_Main.Image.Size.Height) / 2;
+            basePoint.X += (PIC_Main.ClientSize.Width - PIC_Main.Image.Size.Width) / 2;
+            basePoint.Y += (PIC_Main.ClientSize.Height - PIC_Main.Image.Size.Height) / 2;
 
             return basePoint;
         }
 
-        // 표시 해상도에서 '어두운 카드 영역'을 검출해 경계(표시 좌표 L/T/R/B)를 돌려준다.
-        // 비닐/배경(밝음)을 지나 카드(어두움)가 지배적으로 시작하는 위치를 경계로 삼는다.
-        private void DetectCardBox(out int L, out int T, out int R, out int B)
+        // Auto와 '완전히 동일한' 검출기(CardCornerDetector)로 전체 해상도 원본에서 카드 4모서리를
+        // (원본 좌표로) 구하고, 표시 좌표로 스케일한다. → Auto 크롭과 Manual 초기 위치가 일치한다.
+        private void DetectCardQuad(out System.Drawing.PointF tl, out System.Drawing.PointF tr, out System.Drawing.PointF bl, out System.Drawing.PointF br)
         {
-            int W = PIC_Main.Image.Width, H = PIC_Main.Image.Height;
-            L = 0; T = 0; R = W; B = H;   // 실패 시 전체 이미지
-            using (Mat small = new Mat())
-            using (Mat gray = new Mat())
-            using (Mat mask = new Mat())
-            {
-                Cv2.Resize(result, small, new OpenCvSharp.Size(W, H));
-                Cv2.CvtColor(small, gray, ColorConversionCodes.BGR2GRAY);
-                Cv2.GaussianBlur(gray, gray, new OpenCvSharp.Size(5, 5), 0);
-                Cv2.Threshold(gray, mask, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
+            int Wd = PIC_Main.Image.Width, Hd = PIC_Main.Image.Height;   // 표시 크기
+            tl = new System.Drawing.PointF(0, 0);
+            tr = new System.Drawing.PointF(Wd, 0);
+            bl = new System.Drawing.PointF(0, Hd);
+            br = new System.Drawing.PointF(Wd, Hd);
 
-                int[] lh = new int[W], rh = new int[W], th = new int[H], bh = new int[H];
-                for (int y = 0; y < H; ++y)
-                {
-                    int l = -1; for (int x = 0; x < W; ++x) if (mask.At<byte>(y, x) != 0) { l = x; break; }
-                    if (l < 0) continue;
-                    int r = W - 1; for (int x = W - 1; x >= 0; --x) if (mask.At<byte>(y, x) != 0) { r = x; break; }
-                    lh[l]++; rh[r]++;
-                }
-                for (int x = 0; x < W; ++x)
-                {
-                    int t = -1; for (int y = 0; y < H; ++y) if (mask.At<byte>(y, x) != 0) { t = y; break; }
-                    if (t < 0) continue;
-                    int b = H - 1; for (int y = H - 1; y >= 0; --y) if (mask.At<byte>(y, x) != 0) { b = y; break; }
-                    th[t]++; bh[b]++;
-                }
-                int dl = FindDominantBound(lh, true, W), dr = FindDominantBound(rh, false, 0);
-                int dt = FindDominantBound(th, true, H), db = FindDominantBound(bh, false, 0);
-                if (dr > dl && db > dt) { L = dl; T = dt; R = dr; B = db; }
-            }
-        }
+            int Wf = result.Cols, Hf = result.Rows;                       // 전체 해상도
+            if (Wf < 1 || Hf < 1)
+                return;
 
-        // 최외곽 에지에서 시작해 여백창(치수의 8%) 안의 최강 위치 클러스터 바깥 끝을 경계로.
-        private int FindDominantBound(int[] hist, bool fromStart, int fallback)
-        {
-            int len = hist.Length, smallThr = Math.Max(5, len / 100);
-            int B1 = -1, csum = 0;
-            if (fromStart) { for (int i = 0; i < len; ++i) { csum += hist[i]; if (csum >= smallThr) { B1 = i; break; } } }
-            else { for (int i = len - 1; i >= 0; --i) { csum += hist[i]; if (csum >= smallThr) { B1 = i; break; } } }
-            if (B1 < 0) return fallback;
+            // Manual에서는 단계별 DEBUG 프리뷰를 띄우지 않는다(showDebug: false).
+            Point2f[] cor;
+            if (!CardCornerDetector.DetectOriginalCorners(result, adjThresholdOffset, false, out cor))
+                return;
 
-            int maxMargin = Math.Max(40, (int)(len * 0.08));
-            int Pm = B1, pmVal = 0;
-            if (fromStart) { for (int i = B1; i <= Math.Min(len - 1, B1 + maxMargin); ++i) if (hist[i] > pmVal) { pmVal = hist[i]; Pm = i; } }
-            else { for (int i = B1; i >= Math.Max(0, B1 - maxMargin); --i) if (hist[i] > pmVal) { pmVal = hist[i]; Pm = i; } }
-
-            int clusterThr = Math.Max(8, (int)(pmVal * 0.4));
-            int b = Pm;
-            if (fromStart) { while (b - 1 >= 0 && hist[b - 1] >= clusterThr) b--; }
-            else { while (b + 1 < len && hist[b + 1] >= clusterThr) b++; }
-            return b;
+            // 전체 해상도 → 표시 좌표로 스케일 (cor 순서: TL, TR, BR, BL)
+            double sx = (double)Wd / Wf, sy = (double)Hd / Hf;
+            tl = new System.Drawing.PointF((float)(cor[0].X * sx), (float)(cor[0].Y * sy));
+            tr = new System.Drawing.PointF((float)(cor[1].X * sx), (float)(cor[1].Y * sy));
+            br = new System.Drawing.PointF((float)(cor[2].X * sx), (float)(cor[2].Y * sy));
+            bl = new System.Drawing.PointF((float)(cor[3].X * sx), (float)(cor[3].Y * sy));
         }
 
         private void BTN_Confirm_Click(object sender, EventArgs e)
@@ -239,24 +212,11 @@ namespace ScannedCardDenoiser
             Left.Dispose();
             Right.Dispose();
 
-            // 결과 미리보기 후 확정 여부 확인
-            string previewWin = "결과 미리보기";
-            Cv2.ImShow(previewWin, finalResult);
-            Cv2.WaitKey(1);
-            DialogResult answer = MessageBox.Show("이 결과로 확정하시겠습니까?\n(아니오 → 점을 다시 조정)", "결과 미리보기", MessageBoxButtons.YesNo);
-            Cv2.DestroyWindow(previewWin);
-
-            if (answer == DialogResult.Yes)
-            {
-                result.Dispose();        // 원본 해제
-                result = finalResult;    // 결과로 교체
-                DialogResult = DialogResult.OK;
-                this.Close();
-            }
-            else
-            {
-                finalResult.Dispose();   // 재편집을 위해 원본 유지, 다이얼로그 닫지 않음
-            }
+            // 확정 단계(미리보기/확인) 없이 바로 결과로 확정한다.
+            result.Dispose();        // 원본 해제
+            result = finalResult;    // 결과로 교체
+            DialogResult = DialogResult.OK;
+            this.Close();
         }
 
         OpenCvSharp.Vec2f GetPointsCv(float Scale, System.Drawing.Point Base, System.Drawing.Point ToSub)
@@ -445,8 +405,7 @@ namespace ScannedCardDenoiser
 
         private void PointLocationChanged(object sender, EventArgs e)
         {
-            PictureBox pictureBox = (PictureBox)sender;
-            pictureBox.Location = new System.Drawing.Point(Math.Max(Math.Min(pictureBox.Location.X, max.X), min.X), Math.Max(Math.Min(pictureBox.Location.Y, max.Y), min.Y));            
+            // 포인트가 이미지 영역을 벗어나도 허용한다(경계 클램프 없음).
         }
 
         private void MovePoint(ref PictureBox PointBox, object sender, MouseEventArgs e)
@@ -594,36 +553,23 @@ namespace ScannedCardDenoiser
             PointBox2.Location = new System.Drawing.Point(PointBox2.Location.X + Delta.X, PointBox2.Location.Y + Delta.Y);
         }
 
-        private bool bTopCenterMoveStart = false;
         private bool bTopLineMove = false;
         private void TopCenterMouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Right)
-            {
-                bTopCenterMoveStart = true;
-            }
-            else if (e.Button == MouseButtons.Left)
-            {
-                bTopLineMove = true;
-                BaseP1 = TopLeft.Location;
-                BaseP2 = TopRight.Location;
-            }
+            // 중앙점은 양옆 코너와 함께 이동(변 전체 이동).
+            bTopLineMove = true;
+            BaseP1 = TopLeft.Location;
+            BaseP2 = TopRight.Location;
         }
 
         private void TopCenterMouseUp(object sender, MouseEventArgs e)
         {
-            bTopCenterMoveStart = false;
             bTopLineMove = false;
         }
 
         private void TopCenterMouseMove(object sender, MouseEventArgs e)
         {
-            if (bTopCenterMoveStart)
-            {
-                MoveCenterPoint(ref TopCenter, sender, e, TopLeft.Location, TopRight.Location);
-                PIC_Main.Invalidate();
-            }
-            else if (bTopLineMove)
+            if (bTopLineMove)
             {
                 MoveNeighborPoint(ref TopCenter, sender, e, BaseP1, BaseP2, ref TopLeft, ref TopRight);
                 MoveCenterPoint(ref CenterLeft, TopLeft.Location, BottomLeft.Location);
@@ -632,36 +578,22 @@ namespace ScannedCardDenoiser
             }
         }
 
-        private bool bBottomCenterMoveStart = false;
         private bool bBottomLineMove = false;
         private void BottomCenterMouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Right)
-            {
-                bBottomCenterMoveStart = true;
-            }
-            else if (e.Button == MouseButtons.Left)
-            {
-                bBottomLineMove = true;
-                BaseP1 = BottomLeft.Location;
-                BaseP2 = BottomRight.Location;
-            }
+            bBottomLineMove = true;
+            BaseP1 = BottomLeft.Location;
+            BaseP2 = BottomRight.Location;
         }
 
         private void BottomCenterMouseUp(object sender, MouseEventArgs e)
         {
-            bBottomCenterMoveStart = false;
             bBottomLineMove = false;
         }
 
         private void BottomCenterMouseMove(object sender, MouseEventArgs e)
         {
-            if (bBottomCenterMoveStart)
-            {
-                MoveCenterPoint(ref BottomCenter, sender, e, BottomLeft.Location, BottomRight.Location);
-                PIC_Main.Invalidate();
-            }
-            else if (bBottomLineMove)
+            if (bBottomLineMove)
             {
                 MoveNeighborPoint(ref BottomCenter, sender, e, BaseP1, BaseP2, ref BottomLeft, ref BottomRight);
                 MoveCenterPoint(ref CenterLeft, TopLeft.Location, BottomLeft.Location);
@@ -670,36 +602,22 @@ namespace ScannedCardDenoiser
             }
         }
 
-        private bool bCenterLeftMoveStart = false;
         private bool bLeftLineMove = false;
         private void CenterLeftMouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Right)
-            {
-                bCenterLeftMoveStart = true;
-            }
-            else if (e.Button == MouseButtons.Left)
-            {
-                bLeftLineMove = true;
-                BaseP1 = TopLeft.Location;
-                BaseP2 = BottomLeft.Location;
-            }
+            bLeftLineMove = true;
+            BaseP1 = TopLeft.Location;
+            BaseP2 = BottomLeft.Location;
         }
 
         private void CenterLeftMouseUp(object sender, MouseEventArgs e)
         {
-            bCenterLeftMoveStart = false;
             bLeftLineMove = false;
         }
 
         private void CenterLeftMouseMove(object sender, MouseEventArgs e)
         {
-            if (bCenterLeftMoveStart)
-            {
-                MoveCenterPoint(ref CenterLeft, sender, e, TopLeft.Location, BottomLeft.Location);
-                PIC_Main.Invalidate();
-            }
-            else if (bLeftLineMove)
+            if (bLeftLineMove)
             {
                 MoveNeighborPoint(ref CenterLeft, sender, e, BaseP1, BaseP2, ref TopLeft, ref BottomLeft);
                 MoveCenterPoint(ref TopCenter, TopLeft.Location, TopRight.Location);
@@ -708,38 +626,24 @@ namespace ScannedCardDenoiser
             }
         }
 
-        private bool bCenterRightMoveStart = false;
         private bool bRightLineMove = false;
         private System.Drawing.Point BaseP1 = new System.Drawing.Point();
         private System.Drawing.Point BaseP2 = new System.Drawing.Point();
         private void CenterRightMouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Right)
-            {
-                bCenterRightMoveStart = true;
-            }
-            else if(e.Button == MouseButtons.Left)
-            {
-                bRightLineMove = true;
-                BaseP1 = TopRight.Location;
-                BaseP2 = BottomRight.Location;
-            }
+            bRightLineMove = true;
+            BaseP1 = TopRight.Location;
+            BaseP2 = BottomRight.Location;
         }
 
         private void CenterRightMouseUp(object sender, MouseEventArgs e)
         {
-            bCenterRightMoveStart = false;
             bRightLineMove = false;
         }
 
         private void CenterRightMouseMove(object sender, MouseEventArgs e)
         {
-            if (bCenterRightMoveStart)
-            {
-                MoveCenterPoint(ref CenterRight, sender, e, TopRight.Location, BottomRight.Location);
-                PIC_Main.Invalidate();
-            }
-            else if(bRightLineMove)
+            if(bRightLineMove)
             {
                 MoveNeighborPoint(ref CenterRight, sender, e, BaseP1, BaseP2, ref TopRight, ref BottomRight);
                 MoveCenterPoint(ref TopCenter,TopLeft.Location, TopRight.Location);

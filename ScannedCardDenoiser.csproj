@@ -88,6 +88,30 @@
     <Reference Include="OpenCvSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=6adad1e807fea099, processorArchitecture=MSIL">
       <HintPath>packages\OpenCvSharp4.4.10.0.20241108\lib\netstandard2.0\OpenCvSharp.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Bcl.HashCode">
+      <HintPath>packages\Microsoft.Bcl.HashCode.1.0.0\lib\net461\Microsoft.Bcl.HashCode.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="UglyToad.PdfPig">
+      <HintPath>packages\PdfPig.0.1.9\lib\net471\UglyToad.PdfPig.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="UglyToad.PdfPig.Core">
+      <HintPath>packages\PdfPig.0.1.9\lib\net471\UglyToad.PdfPig.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="UglyToad.PdfPig.Fonts">
+      <HintPath>packages\PdfPig.0.1.9\lib\net471\UglyToad.PdfPig.Fonts.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="UglyToad.PdfPig.Tokenization">
+      <HintPath>packages\PdfPig.0.1.9\lib\net471\UglyToad.PdfPig.Tokenization.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="UglyToad.PdfPig.Tokens">
+      <HintPath>packages\PdfPig.0.1.9\lib\net471\UglyToad.PdfPig.Tokens.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Reference Include="System" />
@@ -132,6 +156,16 @@
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
     <Compile Include="PreviewForm.cs" />
+    <Compile Include="Pipeline\ImagePipeline.cs" />
+    <Compile Include="Pipeline\CardCornerDetector.cs" />
+    <Compile Include="Pipeline\LoadStep.cs" />
+    <Compile Include="Pipeline\AreaAdjustStep.cs" />
+    <Compile Include="Pipeline\BrightnessStep.cs" />
+    <Compile Include="Pipeline\DenoiseStep.cs" />
+    <Compile Include="Pipeline\AutoLevelStep.cs" />
+    <Compile Include="Pipeline\SharpenStep.cs" />
+    <Compile Include="Pipeline\ResizeStep.cs" />
+    <Compile Include="Pipeline\ClipStep.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="CamScanForm.resx">

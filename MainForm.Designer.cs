@@ -110,8 +110,10 @@
             this.RB_WaifuLow = new System.Windows.Forms.RadioButton();
             this.Label_FileName = new System.Windows.Forms.Label();
             this.CB_Overwrite = new System.Windows.Forms.CheckBox();
+            this.CB_PdfExtract = new System.Windows.Forms.CheckBox();
             this.TB_Brightness = new System.Windows.Forms.TrackBar();
             this.lbl_BrightnessVal = new System.Windows.Forms.Label();
+            this.CB_Brightness = new System.Windows.Forms.CheckBox();
             this.CB_Sharpen = new System.Windows.Forms.CheckBox();
             this.lbl_SharpenVal = new System.Windows.Forms.Label();
             this.TB_Sharpen = new System.Windows.Forms.TrackBar();
@@ -127,7 +129,7 @@
             // 
             // openFileDialog
             // 
-            this.openFileDialog.Filter = "이미지|*.jpg;*.png;*.bmp";
+            this.openFileDialog.Filter = "이미지/PDF|*.jpg;*.png;*.bmp;*.pdf|이미지|*.jpg;*.png;*.bmp|PDF|*.pdf";
             this.openFileDialog.Multiselect = true;
             // 
             // BTN_OpenFile
@@ -213,6 +215,7 @@
             // 
             this.groupBox1.Controls.Add(this.TB_Brightness);
             this.groupBox1.Controls.Add(this.lbl_BrightnessVal);
+            this.groupBox1.Controls.Add(this.CB_Brightness);
             this.groupBox1.Controls.Add(this.CB_Sharpen);
             this.groupBox1.Controls.Add(this.lbl_SharpenVal);
             this.groupBox1.Controls.Add(this.TB_Sharpen);
@@ -249,7 +252,7 @@
             this.groupBox5.Controls.Add(this.RB_ManualAdjust);
             this.groupBox5.Controls.Add(this.RB_AutoAdjust);
             this.groupBox5.Controls.Add(this.label14);
-            this.groupBox5.Location = new System.Drawing.Point(6, 16);
+            this.groupBox5.Location = new System.Drawing.Point(6, 314);
             this.groupBox5.Name = "groupBox5";
             this.groupBox5.Size = new System.Drawing.Size(206, 83);
             this.groupBox5.TabIndex = 12;
@@ -265,6 +268,7 @@
             this.RB_NoneAdjust.TabIndex = 13;
             this.RB_NoneAdjust.Text = "No";
             this.RB_NoneAdjust.UseVisualStyleBackColor = true;
+            this.RB_NoneAdjust.CheckedChanged += new System.EventHandler(this.RB_AutoAdjust_CheckedChanged);
             // 
             // TB_AdjThreshold
             // 
@@ -272,7 +276,7 @@
             this.TB_AdjThreshold.Name = "TB_AdjThreshold";
             this.TB_AdjThreshold.Size = new System.Drawing.Size(41, 21);
             this.TB_AdjThreshold.TabIndex = 11;
-            this.TB_AdjThreshold.Text = "50";
+            this.TB_AdjThreshold.Text = "0";
             this.TB_AdjThreshold.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.TB_AdjThreshold.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.TB_OnlyDigit_KeyPressed);
             // 
@@ -285,6 +289,7 @@
             this.RB_ManualAdjust.TabIndex = 12;
             this.RB_ManualAdjust.Text = "Manual (Experimental)";
             this.RB_ManualAdjust.UseVisualStyleBackColor = true;
+            this.RB_ManualAdjust.CheckedChanged += new System.EventHandler(this.RB_AutoAdjust_CheckedChanged);
             // 
             // RB_AutoAdjust
             // 
@@ -311,7 +316,7 @@
             // 
             // BTN_AutoLevelDefault
             // 
-            this.BTN_AutoLevelDefault.Location = new System.Drawing.Point(13, 304);
+            this.BTN_AutoLevelDefault.Location = new System.Drawing.Point(13, 216);
             this.BTN_AutoLevelDefault.Name = "BTN_AutoLevelDefault";
             this.BTN_AutoLevelDefault.Size = new System.Drawing.Size(52, 23);
             this.BTN_AutoLevelDefault.TabIndex = 8;
@@ -321,7 +326,7 @@
             // 
             // BTN_DenoiseDefault
             // 
-            this.BTN_DenoiseDefault.Location = new System.Drawing.Point(11, 235);
+            this.BTN_DenoiseDefault.Location = new System.Drawing.Point(11, 79);
             this.BTN_DenoiseDefault.Name = "BTN_DenoiseDefault";
             this.BTN_DenoiseDefault.Size = new System.Drawing.Size(52, 23);
             this.BTN_DenoiseDefault.TabIndex = 8;
@@ -331,7 +336,7 @@
             // 
             // TB_DenoiseSSize
             // 
-            this.TB_DenoiseSSize.Location = new System.Drawing.Point(147, 238);
+            this.TB_DenoiseSSize.Location = new System.Drawing.Point(147, 82);
             this.TB_DenoiseSSize.Name = "TB_DenoiseSSize";
             this.TB_DenoiseSSize.Size = new System.Drawing.Size(45, 21);
             this.TB_DenoiseSSize.TabIndex = 7;
@@ -341,7 +346,7 @@
             // 
             // TB_DenoiseTSize
             // 
-            this.TB_DenoiseTSize.Location = new System.Drawing.Point(147, 217);
+            this.TB_DenoiseTSize.Location = new System.Drawing.Point(147, 61);
             this.TB_DenoiseTSize.Name = "TB_DenoiseTSize";
             this.TB_DenoiseTSize.Size = new System.Drawing.Size(45, 21);
             this.TB_DenoiseTSize.TabIndex = 7;
@@ -351,7 +356,7 @@
             // 
             // TB_DenoiseHColor
             // 
-            this.TB_DenoiseHColor.Location = new System.Drawing.Point(171, 194);
+            this.TB_DenoiseHColor.Location = new System.Drawing.Point(171, 38);
             this.TB_DenoiseHColor.Name = "TB_DenoiseHColor";
             this.TB_DenoiseHColor.Size = new System.Drawing.Size(21, 21);
             this.TB_DenoiseHColor.TabIndex = 7;
@@ -361,7 +366,7 @@
             // 
             // TB_DenoiseH
             // 
-            this.TB_DenoiseH.Location = new System.Drawing.Point(93, 194);
+            this.TB_DenoiseH.Location = new System.Drawing.Point(93, 38);
             this.TB_DenoiseH.Name = "TB_DenoiseH";
             this.TB_DenoiseH.Size = new System.Drawing.Size(21, 21);
             this.TB_DenoiseH.TabIndex = 7;
@@ -372,7 +377,7 @@
             // label8
             // 
             this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(69, 241);
+            this.label8.Location = new System.Drawing.Point(69, 85);
             this.label8.Name = "label8";
             this.label8.Size = new System.Drawing.Size(74, 12);
             this.label8.TabIndex = 6;
@@ -381,7 +386,7 @@
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(57, 220);
+            this.label7.Location = new System.Drawing.Point(57, 64);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(87, 12);
             this.label7.TabIndex = 6;
@@ -390,7 +395,7 @@
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(123, 197);
+            this.label6.Location = new System.Drawing.Point(123, 41);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(42, 12);
             this.label6.TabIndex = 6;
@@ -399,7 +404,7 @@
             // label5
             // 
             this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(75, 197);
+            this.label5.Location = new System.Drawing.Point(75, 41);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(12, 12);
             this.label5.TabIndex = 6;
@@ -407,7 +412,7 @@
             // 
             // TB_AutoLevelMax
             // 
-            this.TB_AutoLevelMax.Location = new System.Drawing.Point(156, 300);
+            this.TB_AutoLevelMax.Location = new System.Drawing.Point(156, 212);
             this.TB_AutoLevelMax.Name = "TB_AutoLevelMax";
             this.TB_AutoLevelMax.Size = new System.Drawing.Size(36, 21);
             this.TB_AutoLevelMax.TabIndex = 5;
@@ -419,7 +424,7 @@
             // 
             this.label17.AutoSize = true;
             this.label17.Font = new System.Drawing.Font("굴림", 9F);
-            this.label17.Location = new System.Drawing.Point(194, 303);
+            this.label17.Location = new System.Drawing.Point(194, 215);
             this.label17.Name = "label17";
             this.label17.Size = new System.Drawing.Size(15, 12);
             this.label17.TabIndex = 2;
@@ -429,7 +434,7 @@
             // 
             this.label16.AutoSize = true;
             this.label16.Font = new System.Drawing.Font("굴림", 9F);
-            this.label16.Location = new System.Drawing.Point(194, 285);
+            this.label16.Location = new System.Drawing.Point(194, 197);
             this.label16.Name = "label16";
             this.label16.Size = new System.Drawing.Size(15, 12);
             this.label16.TabIndex = 2;
@@ -437,7 +442,7 @@
             // 
             // TB_AutoLevelMin
             // 
-            this.TB_AutoLevelMin.Location = new System.Drawing.Point(156, 282);
+            this.TB_AutoLevelMin.Location = new System.Drawing.Point(156, 194);
             this.TB_AutoLevelMin.Name = "TB_AutoLevelMin";
             this.TB_AutoLevelMin.Size = new System.Drawing.Size(36, 21);
             this.TB_AutoLevelMin.TabIndex = 4;
@@ -449,7 +454,7 @@
             // 
             this.label4.AutoSize = true;
             this.label4.Font = new System.Drawing.Font("굴림", 9F);
-            this.label4.Location = new System.Drawing.Point(124, 309);
+            this.label4.Location = new System.Drawing.Point(124, 221);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(30, 12);
             this.label4.TabIndex = 3;
@@ -459,7 +464,7 @@
             // 
             this.label3.AutoSize = true;
             this.label3.Font = new System.Drawing.Font("굴림", 9F);
-            this.label3.Location = new System.Drawing.Point(124, 291);
+            this.label3.Location = new System.Drawing.Point(124, 203);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(26, 12);
             this.label3.TabIndex = 2;
@@ -470,7 +475,7 @@
             this.CB_DenoiseColor.AutoSize = true;
             this.CB_DenoiseColor.Checked = true;
             this.CB_DenoiseColor.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_DenoiseColor.Location = new System.Drawing.Point(6, 172);
+            this.CB_DenoiseColor.Location = new System.Drawing.Point(6, 16);
             this.CB_DenoiseColor.Name = "CB_DenoiseColor";
             this.CB_DenoiseColor.Size = new System.Drawing.Size(173, 16);
             this.CB_DenoiseColor.TabIndex = 1;
@@ -483,7 +488,7 @@
             this.CB_AutoLevel.AutoSize = true;
             this.CB_AutoLevel.Checked = true;
             this.CB_AutoLevel.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_AutoLevel.Location = new System.Drawing.Point(6, 266);
+            this.CB_AutoLevel.Location = new System.Drawing.Point(6, 178);
             this.CB_AutoLevel.Name = "CB_AutoLevel";
             this.CB_AutoLevel.Size = new System.Drawing.Size(122, 16);
             this.CB_AutoLevel.TabIndex = 0;
@@ -864,7 +869,7 @@
             this.BTN_ShowPreview.Text = "Show Preview";
             this.BTN_ShowPreview.UseVisualStyleBackColor = true;
             this.BTN_ShowPreview.Click += new System.EventHandler(this.BTN_ShowPreview_Click);
-            // 
+            //
             // groupBox3
             // 
             this.groupBox3.Controls.Add(this.BTN_waifu2x);
@@ -1033,17 +1038,39 @@
             this.CB_Overwrite.Text = "Overwrite";
             this.CB_Overwrite.UseVisualStyleBackColor = true;
             //
+            // CB_PdfExtract
+            //
+            this.CB_PdfExtract.AutoSize = true;
+            this.CB_PdfExtract.Location = new System.Drawing.Point(350, 59);
+            this.CB_PdfExtract.Name = "CB_PdfExtract";
+            this.CB_PdfExtract.Size = new System.Drawing.Size(216, 16);
+            this.CB_PdfExtract.TabIndex = 17;
+            this.CB_PdfExtract.Text = "PDF 이미지 추출(원본 폴더에 저장)";
+            this.CB_PdfExtract.UseVisualStyleBackColor = true;
+            //
+            // CB_Brightness
+            //
+            this.CB_Brightness.AutoSize = true;
+            this.CB_Brightness.Location = new System.Drawing.Point(6, 110);
+            this.CB_Brightness.Name = "CB_Brightness";
+            this.CB_Brightness.Size = new System.Drawing.Size(84, 16);
+            this.CB_Brightness.TabIndex = 23;
+            this.CB_Brightness.Text = "Brightness";
+            this.CB_Brightness.UseVisualStyleBackColor = true;
+            this.CB_Brightness.CheckedChanged += new System.EventHandler(this.CB_Brightness_CheckedChanged);
+            //
             // lbl_BrightnessVal
             //
             this.lbl_BrightnessVal.AutoSize = true;
-            this.lbl_BrightnessVal.Location = new System.Drawing.Point(6, 104);
+            this.lbl_BrightnessVal.Location = new System.Drawing.Point(96, 111);
             this.lbl_BrightnessVal.Name = "lbl_BrightnessVal";
-            this.lbl_BrightnessVal.Size = new System.Drawing.Size(120, 12);
-            this.lbl_BrightnessVal.Text = "Brightness : 0";
+            this.lbl_BrightnessVal.Size = new System.Drawing.Size(17, 12);
+            this.lbl_BrightnessVal.Text = "0";
             //
             // TB_Brightness
             //
-            this.TB_Brightness.Location = new System.Drawing.Point(6, 120);
+            this.TB_Brightness.Enabled = false;
+            this.TB_Brightness.Location = new System.Drawing.Point(6, 126);
             this.TB_Brightness.Maximum = 100;
             this.TB_Brightness.Minimum = -100;
             this.TB_Brightness.Name = "TB_Brightness";
@@ -1056,7 +1083,7 @@
             // CB_Sharpen
             //
             this.CB_Sharpen.AutoSize = true;
-            this.CB_Sharpen.Location = new System.Drawing.Point(6, 334);
+            this.CB_Sharpen.Location = new System.Drawing.Point(6, 246);
             this.CB_Sharpen.Name = "CB_Sharpen";
             this.CB_Sharpen.Size = new System.Drawing.Size(72, 16);
             this.CB_Sharpen.TabIndex = 17;
@@ -1067,7 +1094,7 @@
             // lbl_SharpenVal
             //
             this.lbl_SharpenVal.AutoSize = true;
-            this.lbl_SharpenVal.Location = new System.Drawing.Point(90, 335);
+            this.lbl_SharpenVal.Location = new System.Drawing.Point(90, 247);
             this.lbl_SharpenVal.Name = "lbl_SharpenVal";
             this.lbl_SharpenVal.Size = new System.Drawing.Size(29, 12);
             this.lbl_SharpenVal.Text = "0%";
@@ -1075,7 +1102,7 @@
             // TB_Sharpen
             //
             this.TB_Sharpen.Enabled = false;
-            this.TB_Sharpen.Location = new System.Drawing.Point(6, 350);
+            this.TB_Sharpen.Location = new System.Drawing.Point(6, 262);
             this.TB_Sharpen.Maximum = 200;
             this.TB_Sharpen.Minimum = 0;
             this.TB_Sharpen.Name = "TB_Sharpen";
@@ -1091,6 +1118,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 565);
             this.Controls.Add(this.CB_Overwrite);
+            this.Controls.Add(this.CB_PdfExtract);
             this.Controls.Add(this.Label_FileName);
             this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.BTN_ShowPreview);
@@ -1135,6 +1163,7 @@
 
         private System.Windows.Forms.TrackBar TB_Brightness;
         private System.Windows.Forms.Label lbl_BrightnessVal;
+        private System.Windows.Forms.CheckBox CB_Brightness;
         private System.Windows.Forms.CheckBox CB_Sharpen;
         private System.Windows.Forms.Label lbl_SharpenVal;
         private System.Windows.Forms.TrackBar TB_Sharpen;
@@ -1215,10 +1244,13 @@
         private System.Windows.Forms.Label label18;
         private System.Windows.Forms.CheckBox CB_Waifu2xTTA;
         private System.Windows.Forms.CheckBox CB_Overwrite;
+        private System.Windows.Forms.CheckBox CB_PdfExtract;
         private System.Windows.Forms.GroupBox groupBox5;
         private System.Windows.Forms.RadioButton RB_ManualAdjust;
         private System.Windows.Forms.RadioButton RB_AutoAdjust;
         private System.Windows.Forms.RadioButton RB_NoneAdjust;
     }
 }
+
+
 

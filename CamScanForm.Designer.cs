@@ -52,7 +52,7 @@
             // 
             // BTN_Confirm
             // 
-            this.BTN_Confirm.Location = new System.Drawing.Point(585, 658);
+            this.BTN_Confirm.Location = new System.Drawing.Point(795, 738);
             this.BTN_Confirm.Name = "BTN_Confirm";
             this.BTN_Confirm.Size = new System.Drawing.Size(67, 36);
             this.BTN_Confirm.TabIndex = 0;
@@ -62,9 +62,9 @@
             // 
             // PIC_Main
             // 
-            this.PIC_Main.Location = new System.Drawing.Point(12, 12);
+            this.PIC_Main.Location = new System.Drawing.Point(0, 0);
             this.PIC_Main.Name = "PIC_Main";
-            this.PIC_Main.Size = new System.Drawing.Size(640, 640);
+            this.PIC_Main.Size = new System.Drawing.Size(880, 780);
             this.PIC_Main.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
             this.PIC_Main.TabIndex = 1;
             this.PIC_Main.TabStop = false;
@@ -197,7 +197,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(664, 699);
+            this.ClientSize = new System.Drawing.Size(880, 780);
             this.Controls.Add(this.CenterRight);
             this.Controls.Add(this.TopRight);
             this.Controls.Add(this.TopCenter);
