@@ -30,6 +30,9 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(CamScanForm));
             this.BTN_Confirm = new System.Windows.Forms.Button();
+            this.BTN_Reset = new System.Windows.Forms.Button();
+            this.LBL_Rotate = new System.Windows.Forms.Label();
+            this.TRB_Rotate = new System.Windows.Forms.TrackBar();
             this.PIC_Main = new System.Windows.Forms.PictureBox();
             this.TopLeft = new System.Windows.Forms.PictureBox();
             this.TopRight = new System.Windows.Forms.PictureBox();
@@ -39,6 +42,7 @@
             this.BottomCenter = new System.Windows.Forms.PictureBox();
             this.CenterLeft = new System.Windows.Forms.PictureBox();
             this.CenterRight = new System.Windows.Forms.PictureBox();
+            ((System.ComponentModel.ISupportInitialize)(this.TRB_Rotate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.PIC_Main)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.TopLeft)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.TopRight)).BeginInit();
@@ -59,9 +63,42 @@
             this.BTN_Confirm.Text = "완료";
             this.BTN_Confirm.UseVisualStyleBackColor = true;
             this.BTN_Confirm.Click += new System.EventHandler(this.BTN_Confirm_Click);
-            // 
+            //
+            // BTN_Reset
+            //
+            this.BTN_Reset.Location = new System.Drawing.Point(795, 696);
+            this.BTN_Reset.Name = "BTN_Reset";
+            this.BTN_Reset.Size = new System.Drawing.Size(67, 36);
+            this.BTN_Reset.TabIndex = 5;
+            this.BTN_Reset.Text = "리셋";
+            this.BTN_Reset.UseVisualStyleBackColor = true;
+            this.BTN_Reset.Click += new System.EventHandler(this.BTN_Reset_Click);
+            //
+            // LBL_Rotate
+            //
+            this.LBL_Rotate.BackColor = System.Drawing.Color.White;
+            this.LBL_Rotate.Location = new System.Drawing.Point(12, 708);
+            this.LBL_Rotate.Name = "LBL_Rotate";
+            this.LBL_Rotate.Size = new System.Drawing.Size(120, 24);
+            this.LBL_Rotate.TabIndex = 3;
+            this.LBL_Rotate.Text = "기울기: 0.0°";
+            this.LBL_Rotate.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // TRB_Rotate
+            //
+            this.TRB_Rotate.BackColor = System.Drawing.Color.White;
+            this.TRB_Rotate.LargeChange = 10;
+            this.TRB_Rotate.Location = new System.Drawing.Point(12, 734);
+            this.TRB_Rotate.Maximum = 900;
+            this.TRB_Rotate.Minimum = -900;
+            this.TRB_Rotate.Name = "TRB_Rotate";
+            this.TRB_Rotate.Size = new System.Drawing.Size(783, 45);
+            this.TRB_Rotate.TabIndex = 4;
+            this.TRB_Rotate.TickFrequency = 100;
+            this.TRB_Rotate.Scroll += new System.EventHandler(this.TRB_Rotate_Scroll);
+            //
             // PIC_Main
-            // 
+            //
             this.PIC_Main.Location = new System.Drawing.Point(0, 0);
             this.PIC_Main.Name = "PIC_Main";
             this.PIC_Main.Size = new System.Drawing.Size(880, 780);
@@ -207,9 +244,13 @@
             this.Controls.Add(this.BottomLeft);
             this.Controls.Add(this.TopLeft);
             this.Controls.Add(this.BTN_Confirm);
+            this.Controls.Add(this.BTN_Reset);
+            this.Controls.Add(this.LBL_Rotate);
+            this.Controls.Add(this.TRB_Rotate);
             this.Controls.Add(this.PIC_Main);
             this.Name = "CamScanForm";
             this.Text = "CamScanForm";
+            ((System.ComponentModel.ISupportInitialize)(this.TRB_Rotate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.PIC_Main)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.TopLeft)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.TopRight)).EndInit();
@@ -226,6 +267,9 @@
         #endregion
 
         private System.Windows.Forms.Button BTN_Confirm;
+        private System.Windows.Forms.Button BTN_Reset;
+        private System.Windows.Forms.Label LBL_Rotate;
+        private System.Windows.Forms.TrackBar TRB_Rotate;
         private System.Windows.Forms.PictureBox PIC_Main;
         private System.Windows.Forms.PictureBox TopLeft;
         private System.Windows.Forms.PictureBox TopRight;

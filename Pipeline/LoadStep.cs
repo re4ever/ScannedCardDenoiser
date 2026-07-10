@@ -13,29 +13,34 @@ namespace ScannedCardDenoiser
             Mat image;
             if (ctx.Manual)
             {
-                // 퍼센트 모드는 절대 크기를 지정하지 않고(0) 이후 리사이즈 단계에서 비율로 처리
-                bool bSizeByPixel = ctx.ChangeSize && !ctx.ResizePercent;
-                int desireLong = bSizeByPixel ? ctx.ResizeW : 0;
-                int desireShort = bSizeByPixel ? ctx.ResizeH : 0;
-
-                // 다이얼로그는 반드시 UI 스레드에서 띄운다(배치 실행은 백그라운드 스레드이므로 Invoke).
-                Mat manualResult = null;
-                ctx.Form.Invoke(new Action(() =>
+                if (ctx.ManualPoints != null)
                 {
-                    using (CamScanForm camScanForm = new CamScanForm(ctx.FilePath, desireLong, desireShort, ctx.AdjThresholdOffset))
+                    // 배치 실행: 사전 수집 단계에서 저장한 코너 포인트로 UI 없이 바로 워프한다.
+                    using (Mat src = Cv2.ImRead(ctx.FilePath))
+                        image = CamScanForm.WarpQuad(src, ctx.ManualPoints);
+                }
+                else
+                {
+                    // 단건 실행(미리보기 등): 다이얼로그로 포인트를 받고 즉시 워프한다.
+                    // 퍼센트 모드는 절대 크기를 지정하지 않고(0) 이후 리사이즈 단계에서 비율로 처리
+                    bool bSizeByPixel = ctx.ChangeSize && !ctx.ResizePercent;
+                    int desireLong = bSizeByPixel ? ctx.ResizeW : 0;
+                    int desireShort = bSizeByPixel ? ctx.ResizeH : 0;
+
+                    // 다이얼로그는 반드시 UI 스레드에서 띄운다(배치 실행은 백그라운드 스레드이므로 Invoke).
+                    Mat manualResult = null;
+                    ctx.Form.Invoke(new Action(() =>
                     {
-                        if (camScanForm.ShowDialog() == DialogResult.OK)
+                        using (CamScanForm camScanForm = new CamScanForm(ctx.FilePath, desireLong, desireShort, ctx.AdjThresholdOffset))
                         {
-                            manualResult = camScanForm.result;   // 결과 Mat 소유권 이전(복사 불필요)
+                            if (camScanForm.ShowDialog() == DialogResult.OK)
+                                manualResult = CamScanForm.WarpQuad(camScanForm.result, camScanForm.QuadPoints);
+                            camScanForm.result?.Dispose();       // 원본은 워프 후 불필요
                             camScanForm.result = null;
                         }
-                        else
-                        {
-                            camScanForm.result?.Dispose();       // 취소 시 로드한 원본 해제
-                        }
-                    }
-                }));
-                image = manualResult;
+                    }));
+                    image = manualResult;
+                }
             }
             else
             {

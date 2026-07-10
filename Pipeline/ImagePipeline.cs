@@ -2,6 +2,15 @@ using OpenCvSharp;
 
 namespace ScannedCardDenoiser
 {
+    // Manual 보정에서 확정한 9개 포인트(전체 해상도 좌표)와 출력 크기.
+    // 포인트 수집 단계와 실제 워프(처리) 단계를 분리하기 위해 사용한다.
+    // (CamScanForm.cs에 두면 폼 클래스보다 앞선 클래스가 리소스 임베드 이름을 바꿔 크래시하므로 여기에 둔다.)
+    public class ManualQuadPoints
+    {
+        public OpenCvSharp.Vec2f TL, TC, TR, CL, CC, CR, BL, BC, BR;
+        public OpenCvSharp.Size ResultSize;
+    }
+
     // 파이프라인 단계 간 공유되는 설정/상태 스냅샷.
     // Process 시작 시 폼 컨트롤 값을 한 번 읽어 채운다(단계는 이 값만 참조).
     class PipelineContext
@@ -13,6 +22,10 @@ namespace ScannedCardDenoiser
         public bool Manual;
         public bool Auto;
         public int AdjThresholdOffset;
+
+        // Manual 배치 실행 시 사전 수집 단계에서 확정한 코너 포인트.
+        // null이면 LoadStep이 다이얼로그를 띄워 그 자리에서 받는다(미리보기 등 단건 실행).
+        public ManualQuadPoints ManualPoints;
 
         // 리사이즈
         public bool ChangeSize;

@@ -23,6 +23,10 @@ namespace ScannedCardDenoiser
     public partial class MainForm : Form
     {
         private Thread th;
+
+        // Manual 배치 실행에서 1단계(포인트 수집)가 채우는 파일별 코너 포인트 맵.
+        // null이면(미리보기 등) LoadStep이 다이얼로그를 띄워 그 자리에서 받는다.
+        private Dictionary<string, ManualQuadPoints> manualPointsMap = null;
         private volatile bool abortRequested;
         string waifu2xExePath;
         string[] sourceFiles;
@@ -599,7 +603,45 @@ namespace ScannedCardDenoiser
                 files = newFiles.ToArray();
             }
 
-            // Manual 보정도 폴더(다중 파일)에서 사용 가능하다. 각 파일마다 순서대로 다이얼로그가 뜬다.
+            // Manual 보정: 1단계에서 모든 파일의 코너 포인트를 순서대로 지정받아 저장하고,
+            // 2단계(아래 처리 루프)에서 저장된 포인트로 디노이즈 등 파이프라인을 순차 실행한다.
+            manualPointsMap = null;
+            if (RB_ManualAdjust.Checked)
+            {
+                bool bSizeByPixel = CB_ChangeSize.Checked && !RB_ResizePercent.Checked;
+                int desireLong = bSizeByPixel ? ParseInt(TB_ResizeW.Text) : 0;
+                int desireShort = bSizeByPixel ? ParseInt(TB_ResizeH.Text) : 0;
+                int thresholdOffset = ParseInt(TB_AdjThreshold.Text);
+
+                var pointsMap = new Dictionary<string, ManualQuadPoints>();
+                var confirmedFiles = new List<string>();
+                foreach (string filepath in files)
+                {
+                    if (abortRequested)
+                        break;
+
+                    ManualQuadPoints points = null;
+                    this.Invoke(new Action(() =>
+                    {
+                        using (CamScanForm camScanForm = new CamScanForm(filepath, desireLong, desireShort, thresholdOffset))
+                        {
+                            if (camScanForm.ShowDialog() == DialogResult.OK)
+                                points = camScanForm.QuadPoints;
+                            camScanForm.result?.Dispose();   // 수집 단계에서는 원본 Mat이 필요 없다
+                            camScanForm.result = null;
+                        }
+                    }));
+
+                    if (points != null)
+                    {
+                        pointsMap[filepath] = points;
+                        confirmedFiles.Add(filepath);
+                    }
+                    // 취소(X)한 파일은 처리 대상에서 제외
+                }
+                files = confirmedFiles.ToArray();
+                manualPointsMap = pointsMap;
+            }
 
             Label_Progress.Invoke(new Action(() =>
             {
@@ -646,6 +688,8 @@ namespace ScannedCardDenoiser
                     }
                 ));
             }
+
+            manualPointsMap = null;   // 다음 실행/미리보기에 이전 포인트가 재사용되지 않도록 정리
 
             BTN_Execute.Invoke(new Action(() =>
             {
@@ -751,6 +795,7 @@ namespace ScannedCardDenoiser
                 Manual = RB_ManualAdjust.Checked,
                 Auto = RB_AutoAdjust.Checked,
                 AdjThresholdOffset = ParseInt(TB_AdjThreshold.Text),
+                ManualPoints = (manualPointsMap != null && manualPointsMap.TryGetValue(filepath, out ManualQuadPoints mp)) ? mp : null,
                 ChangeSize = CB_ChangeSize.Checked,
                 ResizePercent = RB_ResizePercent.Checked,
                 ResizeW = ParseInt(TB_ResizeW.Text),

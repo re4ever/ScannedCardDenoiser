@@ -6,21 +6,40 @@ using OpenCvSharp;
 
 namespace ScannedCardDenoiser
 {
+    // 주의: 이 파일에는 CamScanForm보다 앞에 다른 클래스를 선언하면 안 된다.
+    // (.resx 리소스가 파일의 첫 번째 클래스 이름으로 임베드되어 MissingManifestResourceException이 발생)
     public partial class CamScanForm : Form
     {
         public Mat result { get; set; } = null;
         public OpenCvSharp.Size resultSize { get; set; }
+
+        // 확정(완료) 시 채워지는 포인트 스냅샷. 실제 워프는 WarpQuad로 나중에 수행한다.
+        public ManualQuadPoints QuadPoints { get; private set; } = null;
         public System.Drawing.Point min { get; set; }
         public System.Drawing.Point max { get; set; }
 
         // 초기 4포인트 검출 시 사용하는 Otsu 오프셋(Threshold 컨트롤 값). Auto와 동일한 의미.
         private readonly int adjThresholdOffset;
 
+        // 회전 슬라이더의 기준 상태: 기준 코너 4점(TL,TR,BL,BR)과 그때의 기울기(도).
+        // 슬라이더는 이 기준 대비 절대 각도를 나타내며, 회전은 항상 기준 4점에서 다시 계산한다(누적 오차 방지).
+        private PointF[] rotateBaseQuad = null;
+        private double rotateBaseAngle = 0;
+
         public CamScanForm(string filepath, int desireLong, int desireShort, int adjThresholdOffset = 0)
         {
             this.adjThresholdOffset = adjThresholdOffset;
             result = Cv2.ImRead(filepath);
             InitializeComponent();
+            this.Text = filepath;   // 다중 파일 순차 지정 시 현재 파일 표시
+
+            // 마지막으로 닫았던 창 위치로 복원한다(모든 화면 밖이면 무시하고 기본 위치 사용).
+            RestoreWindowLocation();
+            this.FormClosed += (s, ev) =>
+            {
+                Properties.Settings.Default.CamScanFormLocation = this.Location.X + "," + this.Location.Y;
+                Properties.Settings.Default.Save();
+            };
 
             int srcW, srcH;
             using (Image Src = Image.FromFile(filepath))
@@ -55,11 +74,60 @@ namespace ScannedCardDenoiser
                 resultSize = new OpenCvSharp.Size(srcW, srcH);
             }
 
+            // Auto 검출(기울기 deskew 포함)한 카드 4모서리를 초기 포인트 위치로 사용(실패 시 전체 이미지). (표시 좌표 기준)
+            ApplyAutoPoints();
+
+            // 포인트 컨트롤은 숨기고(투명 박스 잔상 제거) PIC_Main 위에 마커를 직접 그린다.
+            // 드래그/히트테스트도 PIC_Main에서 처리한다.
+            foreach (PictureBox pb in new[] { TopLeft, TopRight, TopCenter, BottomLeft, BottomRight, BottomCenter, CenterLeft, CenterRight })
+                pb.Visible = false;
+
+            // 돋보기 갱신 시 깜빡임 감소 (PictureBox 더블버퍼링)
+            typeof(System.Windows.Forms.Control)
+                .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.SetValue(PIC_Main, true);
+        }
+
+        // 설정에 저장된 "x,y" 위치를 파싱해 창 위치를 복원한다. 어느 모니터에도 걸치지 않으면 무시한다.
+        private void RestoreWindowLocation()
+        {
+            string saved = Properties.Settings.Default.CamScanFormLocation;
+            if (string.IsNullOrEmpty(saved))
+                return;
+
+            string[] parts = saved.Split(',');
+            int lx, ly;
+            if (parts.Length != 2 || !int.TryParse(parts[0], out lx) || !int.TryParse(parts[1], out ly))
+                return;
+
+            Rectangle formRect = new Rectangle(lx, ly, this.Width, this.Height);
+            foreach (Screen sc in Screen.AllScreens)
+            {
+                if (sc.WorkingArea.IntersectsWith(formRect))
+                {
+                    this.StartPosition = FormStartPosition.Manual;
+                    this.Location = new System.Drawing.Point(lx, ly);
+                    return;
+                }
+            }
+        }
+
+        System.Drawing.Point GetBasePoint()
+        {
+            System.Drawing.Point basePoint = new System.Drawing.Point(PIC_Main.Location.X, PIC_Main.Location.Y);
+            basePoint.X += (PIC_Main.ClientSize.Width - PIC_Main.Image.Size.Width) / 2;
+            basePoint.Y += (PIC_Main.ClientSize.Height - PIC_Main.Image.Size.Height) / 2;
+
+            return basePoint;
+        }
+
+        // 현재 슬라이더 threshold로 자동 검출을 실행해 8개 포인트(코너 4 + 중앙 4)를 재배치한다.
+        private void ApplyAutoPoints()
+        {
             System.Drawing.Point basePoint = GetBasePoint();
             basePoint.X -= TopLeft.Size.Width / 2;
             basePoint.Y -= TopLeft.Size.Height / 2;
 
-            // Auto 검출(기울기 deskew 포함)한 카드 4모서리를 초기 포인트 위치로 사용(실패 시 전체 이미지). (표시 좌표 기준)
             System.Drawing.PointF qTL, qTR, qBL, qBR;
             DetectCardQuad(out qTL, out qTR, out qBL, out qBR);
 
@@ -73,24 +141,90 @@ namespace ScannedCardDenoiser
             CenterLeft.Location = new System.Drawing.Point((TopLeft.Location.X + BottomLeft.Location.X) / 2, (TopLeft.Location.Y + BottomLeft.Location.Y) / 2);
             CenterRight.Location = new System.Drawing.Point((TopRight.Location.X + BottomRight.Location.X) / 2, (TopRight.Location.Y + BottomRight.Location.Y) / 2);
 
-            // 포인트 컨트롤은 숨기고(투명 박스 잔상 제거) PIC_Main 위에 마커를 직접 그린다.
-            // 드래그/히트테스트도 PIC_Main에서 처리한다.
-            foreach (PictureBox pb in new[] { TopLeft, TopRight, TopCenter, BottomLeft, BottomRight, BottomCenter, CenterLeft, CenterRight })
-                pb.Visible = false;
-
-            // 돋보기 갱신 시 깜빡임 감소 (PictureBox 더블버퍼링)
-            typeof(System.Windows.Forms.Control)
-                .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                ?.SetValue(PIC_Main, true);
+            CaptureRotationBase();
+            PIC_Main.Invalidate();
         }
 
-        System.Drawing.Point GetBasePoint()
+        // 현재 코너 4점을 회전 기준으로 저장하고, 좌우 중앙(CenterLeft-CenterRight)을 잇는 직선의
+        // 기울기를 슬라이더 값(0.1도 단위)으로 반영한다.
+        private void CaptureRotationBase()
         {
-            System.Drawing.Point basePoint = new System.Drawing.Point(PIC_Main.Location.X, PIC_Main.Location.Y);
-            basePoint.X += (PIC_Main.ClientSize.Width - PIC_Main.Image.Size.Width) / 2;
-            basePoint.Y += (PIC_Main.ClientSize.Height - PIC_Main.Image.Size.Height) / 2;
+            rotateBaseQuad = new PointF[]
+            {
+                new PointF(TopLeft.Location.X, TopLeft.Location.Y),
+                new PointF(TopRight.Location.X, TopRight.Location.Y),
+                new PointF(BottomLeft.Location.X, BottomLeft.Location.Y),
+                new PointF(BottomRight.Location.X, BottomRight.Location.Y),
+            };
+            rotateBaseAngle = Math.Atan2(
+                CenterRight.Location.Y - CenterLeft.Location.Y,
+                CenterRight.Location.X - CenterLeft.Location.X) * 180.0 / Math.PI;
 
-            return basePoint;
+            // 프로그램에 의한 Value 변경은 Scroll 이벤트를 발생시키지 않는다.
+            int v = (int)Math.Round(rotateBaseAngle * 10.0);
+            TRB_Rotate.Value = Math.Max(TRB_Rotate.Minimum, Math.Min(TRB_Rotate.Maximum, v));
+            LBL_Rotate.Text = "기울기: " + (TRB_Rotate.Value / 10.0).ToString("0.0") + "°";
+        }
+
+        // 리셋: 코너 4점을 표시 이미지의 네 끝(모서리)에 배치하고 중앙 4점/회전 기준도 함께 갱신한다.
+        private void BTN_Reset_Click(object sender, EventArgs e)
+        {
+            System.Drawing.Point basePoint = GetBasePoint();
+            basePoint.X -= TopLeft.Size.Width / 2;
+            basePoint.Y -= TopLeft.Size.Height / 2;
+
+            int w = PIC_Main.Image.Width, h = PIC_Main.Image.Height;
+            TopLeft.Location = new System.Drawing.Point(basePoint.X, basePoint.Y);
+            TopRight.Location = new System.Drawing.Point(basePoint.X + w, basePoint.Y);
+            BottomLeft.Location = new System.Drawing.Point(basePoint.X, basePoint.Y + h);
+            BottomRight.Location = new System.Drawing.Point(basePoint.X + w, basePoint.Y + h);
+
+            MoveCenterPoint(ref TopCenter, TopLeft.Location, TopRight.Location);
+            MoveCenterPoint(ref BottomCenter, BottomLeft.Location, BottomRight.Location);
+            MoveCenterPoint(ref CenterLeft, TopLeft.Location, BottomLeft.Location);
+            MoveCenterPoint(ref CenterRight, TopRight.Location, BottomRight.Location);
+
+            CaptureRotationBase();
+            PIC_Main.Invalidate();
+        }
+
+        // 슬라이더 = 절대 기울기(도, 0.1도 단위). 기준 4점을 그 각도가 되도록 4점의 중점 기준으로 회전한다.
+        // 화면 좌표(y가 아래로 증가)에서 +각도 = 시계방향, -각도 = 반시계방향.
+        private void TRB_Rotate_Scroll(object sender, EventArgs e)
+        {
+            if (rotateBaseQuad == null)
+                return;
+
+            double target = TRB_Rotate.Value / 10.0;
+            LBL_Rotate.Text = "기울기: " + target.ToString("0.0") + "°";
+
+            double rad = (target - rotateBaseAngle) * Math.PI / 180.0;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            float cx = 0, cy = 0;
+            foreach (PointF p in rotateBaseQuad) { cx += p.X; cy += p.Y; }
+            cx /= 4; cy /= 4;
+
+            System.Drawing.Point[] rotated = new System.Drawing.Point[4];
+            for (int i = 0; i < 4; i++)
+            {
+                double dx = rotateBaseQuad[i].X - cx, dy = rotateBaseQuad[i].Y - cy;
+                rotated[i] = new System.Drawing.Point(
+                    (int)Math.Round(cx + dx * cos - dy * sin),
+                    (int)Math.Round(cy + dx * sin + dy * cos));
+            }
+
+            TopLeft.Location = rotated[0];
+            TopRight.Location = rotated[1];
+            BottomLeft.Location = rotated[2];
+            BottomRight.Location = rotated[3];
+
+            MoveCenterPoint(ref TopCenter, TopLeft.Location, TopRight.Location);
+            MoveCenterPoint(ref BottomCenter, BottomLeft.Location, BottomRight.Location);
+            MoveCenterPoint(ref CenterLeft, TopLeft.Location, BottomLeft.Location);
+            MoveCenterPoint(ref CenterRight, TopRight.Location, BottomRight.Location);
+
+            PIC_Main.Invalidate();
         }
 
         // Auto와 '완전히 동일한' 검출기(CardCornerDetector)로 전체 해상도 원본에서 카드 4모서리를
@@ -120,6 +254,8 @@ namespace ScannedCardDenoiser
             bl = new System.Drawing.PointF((float)(cor[3].X * sx), (float)(cor[3].Y * sy));
         }
 
+        // 확정: 여기서는 워프하지 않고 9개 포인트(전체 해상도 좌표)만 QuadPoints에 저장하고 닫는다.
+        // 실제 변환은 호출 측에서 WarpQuad(result, QuadPoints)로 수행한다.
         private void BTN_Confirm_Click(object sender, EventArgs e)
         {
             System.Drawing.Point basePoint = GetBasePoint();
@@ -127,96 +263,62 @@ namespace ScannedCardDenoiser
             basePoint.Y -= TopLeft.Size.Height / 2;
 
             float Scale = (float)result.Width / PIC_Main.Image.Size.Width;
-            float Scaley = (float)result.Height / PIC_Main.Image.Size.Height;
-
-            Mat TransformedTL = new Mat();
-            Mat TransformedTR = new Mat();
-            Mat TransformedBL = new Mat();
-            Mat TransformedBR = new Mat();
 
             System.Drawing.Point CenterCenterLocation = new System.Drawing.Point((TopCenter.Location.X + BottomCenter.Location.X + CenterLeft.Location.X + CenterRight.Location.X) / 4, (TopCenter.Location.Y + BottomCenter.Location.Y + CenterLeft.Location.Y + CenterRight.Location.Y) / 4);
 
-            List<OpenCvSharp.Vec2f> dstPoints = new List<OpenCvSharp.Vec2f>();
-            dstPoints.Add(new OpenCvSharp.Vec2f(0, 0));
-            dstPoints.Add(new OpenCvSharp.Vec2f(resultSize.Width / 2.0f, 0));
-            dstPoints.Add(new OpenCvSharp.Vec2f(0, resultSize.Height / 2.0f));
-            dstPoints.Add(new OpenCvSharp.Vec2f(resultSize.Width / 2.0f, resultSize.Height / 2.0f));
-
-            OpenCvSharp.Size partsSize = new OpenCvSharp.Size(resultSize.Width / 2.0, resultSize.Height / 2.0);
-
-            //TopLeft
+            QuadPoints = new ManualQuadPoints
             {
-                List<OpenCvSharp.Vec2f> srcPoints = new List<OpenCvSharp.Vec2f>();
-                srcPoints.Add(GetPointsCv(Scale, TopLeft.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, TopCenter.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, CenterLeft.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, CenterCenterLocation, basePoint));
+                TL = GetPointsCv(Scale, TopLeft.Location, basePoint),
+                TC = GetPointsCv(Scale, TopCenter.Location, basePoint),
+                TR = GetPointsCv(Scale, TopRight.Location, basePoint),
+                CL = GetPointsCv(Scale, CenterLeft.Location, basePoint),
+                CC = GetPointsCv(Scale, CenterCenterLocation, basePoint),
+                CR = GetPointsCv(Scale, CenterRight.Location, basePoint),
+                BL = GetPointsCv(Scale, BottomLeft.Location, basePoint),
+                BC = GetPointsCv(Scale, BottomCenter.Location, basePoint),
+                BR = GetPointsCv(Scale, BottomRight.Location, basePoint),
+                ResultSize = resultSize,
+            };
 
-                Mat perspectiveTransform = Cv2.GetPerspectiveTransform(InputArray.Create(srcPoints), InputArray.Create(dstPoints));
-                
-                Cv2.WarpPerspective(result, TransformedTL, perspectiveTransform, partsSize);
-                perspectiveTransform.Dispose();
-            }
-            //TopRight
-            {
-                List<OpenCvSharp.Vec2f> srcPoints = new List<OpenCvSharp.Vec2f>();
-                srcPoints.Add(GetPointsCv(Scale, TopCenter.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, TopRight.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, CenterCenterLocation, basePoint)); 
-                srcPoints.Add(GetPointsCv(Scale, CenterRight.Location, basePoint));
-
-                Mat perspectiveTransform = Cv2.GetPerspectiveTransform(InputArray.Create(srcPoints), InputArray.Create(dstPoints));
-
-                Cv2.WarpPerspective(result, TransformedTR, perspectiveTransform, partsSize);
-                perspectiveTransform.Dispose();
-            }
-            //BottomLeft
-            {
-                List<OpenCvSharp.Vec2f> srcPoints = new List<OpenCvSharp.Vec2f>();
-                srcPoints.Add(GetPointsCv(Scale, CenterLeft.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, CenterCenterLocation, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, BottomLeft.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, BottomCenter.Location, basePoint));
-
-                Mat perspectiveTransform = Cv2.GetPerspectiveTransform(InputArray.Create(srcPoints), InputArray.Create(dstPoints));
-
-                Cv2.WarpPerspective(result, TransformedBL, perspectiveTransform, partsSize);
-                perspectiveTransform.Dispose();
-            }
-            //BottomRight
-            {
-                List<OpenCvSharp.Vec2f> srcPoints = new List<OpenCvSharp.Vec2f>();
-                srcPoints.Add(GetPointsCv(Scale, CenterCenterLocation, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, CenterRight.Location, basePoint));
-                srcPoints.Add(GetPointsCv(Scale, BottomCenter.Location, basePoint)); 
-                srcPoints.Add(GetPointsCv(Scale, BottomRight.Location, basePoint));                
-
-                Mat perspectiveTransform = Cv2.GetPerspectiveTransform(InputArray.Create(srcPoints), InputArray.Create(dstPoints));
-
-                Cv2.WarpPerspective(result, TransformedBR, perspectiveTransform, partsSize);
-                perspectiveTransform.Dispose();
-            }
-
-            Mat Left = new Mat();
-            Mat Right = new Mat();
-            Cv2.VConcat(TransformedTL, TransformedBL, Left);
-            Cv2.VConcat(TransformedTR, TransformedBR, Right);
-            // 원본(result)은 그대로 두고 결과는 별도 Mat에 만든다(미리보기 No 시 재편집 위해).
-            Mat finalResult = new Mat();
-            Cv2.HConcat(Left, Right, finalResult);
-
-            TransformedTL.Dispose();
-            TransformedTR.Dispose();
-            TransformedBL.Dispose();
-            TransformedBR.Dispose();
-            Left.Dispose();
-            Right.Dispose();
-
-            // 확정 단계(미리보기/확인) 없이 바로 결과로 확정한다.
-            result.Dispose();        // 원본 해제
-            result = finalResult;    // 결과로 교체
             DialogResult = DialogResult.OK;
             this.Close();
+        }
+
+        // 저장된 포인트로 4분할(사분면) 원근 변환을 수행해 최종 이미지를 만든다. src는 변경하지 않는다.
+        public static Mat WarpQuad(Mat src, ManualQuadPoints p)
+        {
+            OpenCvSharp.Size partsSize = new OpenCvSharp.Size(p.ResultSize.Width / 2.0, p.ResultSize.Height / 2.0);
+
+            List<Vec2f> dstPoints = new List<Vec2f>
+            {
+                new Vec2f(0, 0),
+                new Vec2f(p.ResultSize.Width / 2.0f, 0),
+                new Vec2f(0, p.ResultSize.Height / 2.0f),
+                new Vec2f(p.ResultSize.Width / 2.0f, p.ResultSize.Height / 2.0f),
+            };
+
+            Func<Vec2f, Vec2f, Vec2f, Vec2f, Mat> warpPart = (p0, p1, p2, p3) =>
+            {
+                List<Vec2f> srcPoints = new List<Vec2f> { p0, p1, p2, p3 };
+                Mat part = new Mat();
+                using (Mat transform = Cv2.GetPerspectiveTransform(InputArray.Create(srcPoints), InputArray.Create(dstPoints)))
+                    Cv2.WarpPerspective(src, part, transform, partsSize);
+                return part;
+            };
+
+            using (Mat tl = warpPart(p.TL, p.TC, p.CL, p.CC))
+            using (Mat tr = warpPart(p.TC, p.TR, p.CC, p.CR))
+            using (Mat bl = warpPart(p.CL, p.CC, p.BL, p.BC))
+            using (Mat br = warpPart(p.CC, p.CR, p.BC, p.BR))
+            using (Mat left = new Mat())
+            using (Mat right = new Mat())
+            {
+                Cv2.VConcat(tl, bl, left);
+                Cv2.VConcat(tr, br, right);
+                Mat final = new Mat();
+                Cv2.HConcat(left, right, final);
+                return final;
+            }
         }
 
         OpenCvSharp.Vec2f GetPointsCv(float Scale, System.Drawing.Point Base, System.Drawing.Point ToSub)
@@ -237,6 +339,7 @@ namespace ScannedCardDenoiser
 
             Graphics g = e.Graphics;
             DrawGuide(g, basePoint, 1f);
+            DrawGizmos(g, basePoint);
 
             // 포인트 마커를 이미지 위에 직접 그린다(배경이 투명하게 보임).
             DrawMarker(g, basePoint, TopLeft, true);
@@ -268,6 +371,53 @@ namespace ScannedCardDenoiser
                 g.DrawLine(pen2, SubPoints(TopCenter.Location, basePoint), SubPoints(BottomCenter.Location, basePoint));
                 g.DrawLine(pen2, SubPoints(CenterLeft.Location, basePoint), SubPoints(CenterRight.Location, basePoint));
             }
+        }
+
+        // ── 코너 기즈모: 각 코너에서 바깥쪽(TL=상/좌, TR=상/우, BL=하/좌, BR=하/우)으로 뻗는 두꺼운 화살표.
+        //    화살표를 잡고 드래그하면 그 축(수직/수평)으로만 포인트가 이동한다(음/양 방향 모두).
+        private const int GizmoStart = 14;        // 포인트 중심에서 화살표 시작까지 거리
+        private const int GizmoEnd = 52;          // 포인트 중심에서 화살표 끝까지 거리
+        private const int GizmoHalfWidth = 9;     // 히트 테스트 허용 폭(축의 수직 방향)
+        private const float GizmoThickness = 7f;  // 화살표 선 두께
+
+        private void DrawGizmos(Graphics g, System.Drawing.Point basePoint)
+        {
+            System.Drawing.Drawing2D.SmoothingMode oldMode = g.SmoothingMode;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            DrawGizmoArrow(g, basePoint, TopLeft, 0, -1);
+            DrawGizmoArrow(g, basePoint, TopLeft, -1, 0);
+            DrawGizmoArrow(g, basePoint, TopRight, 0, -1);
+            DrawGizmoArrow(g, basePoint, TopRight, 1, 0);
+            DrawGizmoArrow(g, basePoint, BottomLeft, 0, 1);
+            DrawGizmoArrow(g, basePoint, BottomLeft, -1, 0);
+            DrawGizmoArrow(g, basePoint, BottomRight, 0, 1);
+            DrawGizmoArrow(g, basePoint, BottomRight, 1, 0);
+
+            g.SmoothingMode = oldMode;
+        }
+
+        private void DrawGizmoArrow(Graphics g, System.Drawing.Point basePoint, PictureBox pb, int dx, int dy)
+        {
+            System.Drawing.Point c = SubPoints(pb.Location, basePoint);
+            Color col = (dx == 0) ? Color.LimeGreen : Color.DodgerBlue;   // 수직 = 초록, 수평 = 파랑
+            using (Pen pen = new Pen(Color.FromArgb(230, col), GizmoThickness))
+            using (System.Drawing.Drawing2D.AdjustableArrowCap cap = new System.Drawing.Drawing2D.AdjustableArrowCap(2.2f, 2.6f, true))
+            {
+                pen.CustomEndCap = cap;
+                g.DrawLine(pen, c.X + dx * GizmoStart, c.Y + dy * GizmoStart, c.X + dx * GizmoEnd, c.Y + dy * GizmoEnd);
+            }
+        }
+
+        // f(폼 클라이언트 좌표)가 pb 코너의 화살표(수직/수평, dir = 화살표가 뻗는 방향) 위에 있는지 검사.
+        private bool HitArrow(System.Drawing.Point f, PictureBox pb, bool vertical, int dir)
+        {
+            double cx = pb.Location.X + pb.Width / 2.0;
+            double cy = pb.Location.Y + pb.Height / 2.0;
+            double along, perp;
+            if (vertical) { along = (f.Y - cy) * dir; perp = f.X - cx; }
+            else { along = (f.X - cx) * dir; perp = f.Y - cy; }
+            return along >= GizmoStart && along <= GizmoEnd + GizmoHalfWidth && Math.Abs(perp) <= GizmoHalfWidth;
         }
 
         private void DrawMarker(Graphics g, System.Drawing.Point basePoint, PictureBox pb, bool corner)
@@ -311,6 +461,9 @@ namespace ScannedCardDenoiser
             {
                 path.AddEllipse(lcx - R, lcy - R, 2 * R, 2 * R);
                 g.SetClip(path);
+                // 배경(#FF00FF): 이미지 밖 영역이 보일 때 마젠타로 채워진다.
+                using (SolidBrush bg = new SolidBrush(Color.FromArgb(0xFF, 0x00, 0xFF)))
+                    g.FillEllipse(bg, lcx - R, lcy - R, 2 * R, 2 * R);
                 g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
                 g.TranslateTransform(lcx, lcy);
                 g.ScaleTransform(Z, Z);
@@ -346,6 +499,12 @@ namespace ScannedCardDenoiser
         private bool dragging = false;
         private PictureBox activePoint = null;
 
+        // 기즈모 화살표 드래그 상태(축 제한 이동)
+        private bool axisDrag = false;
+        private bool axisVertical = false;                 // true = 수직 축, false = 수평 축
+        private System.Drawing.Point axisBaseLoc;          // 드래그 시작 시 코너 Location
+        private System.Drawing.Point axisMouseStart;       // 드래그 시작 시 마우스(폼 클라이언트 좌표)
+
         private PictureBox HitTest(System.Drawing.Point ePicMain)
         {
             System.Drawing.Point f = this.PointToClient(PIC_Main.PointToScreen(ePicMain));
@@ -363,6 +522,27 @@ namespace ScannedCardDenoiser
 
         private void PIC_Main_MouseDown(object sender, MouseEventArgs e)
         {
+            // 기즈모 화살표를 먼저 확인한다(포인트 중심 근처는 아래의 자유 이동이 담당).
+            System.Drawing.Point f = this.PointToClient(PIC_Main.PointToScreen(e.Location));
+            foreach (PictureBox pb in new[] { TopLeft, TopRight, BottomLeft, BottomRight })
+            {
+                int hdx = (pb == TopLeft || pb == BottomLeft) ? -1 : 1;   // 수평 화살표 방향(좌/우)
+                int vdy = (pb == TopLeft || pb == TopRight) ? -1 : 1;    // 수직 화살표 방향(상/하)
+                bool vertical;
+                if (HitArrow(f, pb, true, vdy)) vertical = true;
+                else if (HitArrow(f, pb, false, hdx)) vertical = false;
+                else continue;
+
+                axisDrag = true;
+                axisVertical = vertical;
+                axisBaseLoc = pb.Location;
+                axisMouseStart = f;
+                activePoint = pb;
+                dragging = true;
+                PIC_Main.Invalidate();
+                return;
+            }
+
             PictureBox hit = HitTest(e.Location);
             if (hit == null)
                 return;
@@ -383,6 +563,24 @@ namespace ScannedCardDenoiser
         {
             if (!dragging)
                 return;
+            if (axisDrag)
+            {
+                // 화살표의 축 방향(음/양 모두)으로만 이동한다.
+                System.Drawing.Point f = this.PointToClient(PIC_Main.PointToScreen(e.Location));
+                System.Drawing.Point loc = axisBaseLoc;
+                if (axisVertical)
+                    loc.Y += f.Y - axisMouseStart.Y;
+                else
+                    loc.X += f.X - axisMouseStart.X;
+                activePoint.Location = loc;
+
+                MoveCenterPoint(ref TopCenter, TopLeft.Location, TopRight.Location);
+                MoveCenterPoint(ref BottomCenter, BottomLeft.Location, BottomRight.Location);
+                MoveCenterPoint(ref CenterLeft, TopLeft.Location, BottomLeft.Location);
+                MoveCenterPoint(ref CenterRight, TopRight.Location, BottomRight.Location);
+                PIC_Main.Invalidate();
+                return;
+            }
             TopLeftMouseMove(PIC_Main, e); TopRightMouseMove(PIC_Main, e);
             BottomLeftMouseMove(PIC_Main, e); BottomRightMouseMove(PIC_Main, e);
             TopCenterMouseMove(PIC_Main, e); BottomCenterMouseMove(PIC_Main, e);
@@ -394,12 +592,23 @@ namespace ScannedCardDenoiser
         {
             if (!dragging)
                 return;
+            if (axisDrag)
+            {
+                axisDrag = false;
+                dragging = false;
+                activePoint = null;
+                CaptureRotationBase();
+                PIC_Main.Invalidate();
+                return;
+            }
             TopLeftMouseUp(PIC_Main, e); TopRightMouseUp(PIC_Main, e);
             BottomLeftMouseUp(PIC_Main, e); BottomRightMouseUp(PIC_Main, e);
             TopCenterMouseUp(PIC_Main, e); BottomCenterMouseUp(PIC_Main, e);
             CenterLeftMouseUp(PIC_Main, e); CenterRightMouseUp(PIC_Main, e);
             dragging = false;
             activePoint = null;
+            // 포인트를 손으로 옮긴 뒤에는 회전 기준을 새 위치로 갱신한다(슬라이더 값도 현재 기울기로 동기화).
+            CaptureRotationBase();
             PIC_Main.Invalidate();
         }
 

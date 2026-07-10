@@ -58,5 +58,17 @@ namespace ScannedCardDenoiser.Properties {
                 this["Preferences"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CamScanFormLocation {
+            get {
+                return ((string)(this["CamScanFormLocation"]));
+            }
+            set {
+                this["CamScanFormLocation"] = value;
+            }
+        }
     }
 }
