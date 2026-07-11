@@ -31,6 +31,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(CamScanForm));
             this.BTN_Confirm = new System.Windows.Forms.Button();
             this.BTN_Reset = new System.Windows.Forms.Button();
+            this.BTN_AutoPoints = new System.Windows.Forms.Button();
             this.LBL_Rotate = new System.Windows.Forms.Label();
             this.TRB_Rotate = new System.Windows.Forms.TrackBar();
             this.PIC_Main = new System.Windows.Forms.PictureBox();
@@ -73,6 +74,16 @@
             this.BTN_Reset.Text = "리셋";
             this.BTN_Reset.UseVisualStyleBackColor = true;
             this.BTN_Reset.Click += new System.EventHandler(this.BTN_Reset_Click);
+            //
+            // BTN_AutoPoints
+            //
+            this.BTN_AutoPoints.Location = new System.Drawing.Point(795, 654);
+            this.BTN_AutoPoints.Name = "BTN_AutoPoints";
+            this.BTN_AutoPoints.Size = new System.Drawing.Size(67, 36);
+            this.BTN_AutoPoints.TabIndex = 6;
+            this.BTN_AutoPoints.Text = "자동";
+            this.BTN_AutoPoints.UseVisualStyleBackColor = true;
+            this.BTN_AutoPoints.Click += new System.EventHandler(this.BTN_AutoPoints_Click);
             //
             // LBL_Rotate
             //
@@ -245,6 +256,7 @@
             this.Controls.Add(this.TopLeft);
             this.Controls.Add(this.BTN_Confirm);
             this.Controls.Add(this.BTN_Reset);
+            this.Controls.Add(this.BTN_AutoPoints);
             this.Controls.Add(this.LBL_Rotate);
             this.Controls.Add(this.TRB_Rotate);
             this.Controls.Add(this.PIC_Main);
@@ -268,6 +280,7 @@
 
         private System.Windows.Forms.Button BTN_Confirm;
         private System.Windows.Forms.Button BTN_Reset;
+        private System.Windows.Forms.Button BTN_AutoPoints;
         private System.Windows.Forms.Label LBL_Rotate;
         private System.Windows.Forms.TrackBar TRB_Rotate;
         private System.Windows.Forms.PictureBox PIC_Main;

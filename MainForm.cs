@@ -17,8 +17,7 @@ namespace ScannedCardDenoiser
 {
     enum EErrorType
     {
-        WrongProperty,
-        ErrorWaifu2x
+        WrongProperty
     }
     public partial class MainForm : Form
     {
@@ -28,24 +27,38 @@ namespace ScannedCardDenoiser
         // null이면(미리보기 등) LoadStep이 다이얼로그를 띄워 그 자리에서 받는다.
         private Dictionary<string, ManualQuadPoints> manualPointsMap = null;
         private volatile bool abortRequested;
-        string waifu2xExePath;
         string[] sourceFiles;
         private readonly ToolTip toolTip1 = new ToolTip();
+
+        // ── 결과 프리뷰 상태 ──
+        private Bitmap previewFullBmp = null;       // 결과 전체 해상도(클릭 시 1:1 크롭용)
+        private Bitmap previewOrigFullBmp = null;   // 보정 전(기하만 적용) 전체 해상도 — 줌 분할 비교용
+        private Bitmap previewResultThumb = null;   // 결과 썸네일(최대 300, 비율 유지)
+        private Bitmap zoomOrigCrop = null;         // 줌 뷰의 원본 크롭(결과 크롭과 같은 영역)
+        private double zoomSplitFrac = 0.5;         // 줌 뷰 분할선 위치(이미지 폭 대비 0~1)
+        private bool zoomSplitDrag = false;
+        private string previewMessage = null;       // 썸네일에 표시할 안내 문구(null이면 없음)
+        private bool previewBusy = false;           // 갱신 중(스피너 표시)
+        private int previewSpinnerAngle = 0;
+        // 줌 뷰가 보고 있는 위치(결과 이미지 대비 상대 좌표 0~1). X<0이면 선택 안 됨.
+        // 상대 좌표로 기억해서 결과 크기가 바뀌어도 같은 지점을 다시 크롭한다.
+        private PointF previewZoomCenter = new PointF(-1f, -1f);
+        private System.Drawing.Point previewHover = new System.Drawing.Point(-1, -1);
+        private readonly System.Windows.Forms.Timer previewRefreshTimer = new System.Windows.Forms.Timer { Interval = 600 };  // 값 변경 디바운스
+        private readonly System.Windows.Forms.Timer previewSpinnerTimer = new System.Windows.Forms.Timer { Interval = 80 };
+        private Thread previewThread = null;
+        private volatile bool previewRerun = false; // 갱신 중 값이 또 바뀌면 끝나고 한 번 더
+
+        // Manual 미리보기용 코너 포인트('포인트 지정' 버튼으로 설정, 원본 이미지가 바뀌면 초기화)
+        private ManualQuadPoints previewManualPoints = null;
+        private string previewPointsFile = null;
 
         public MainForm()
         {
             InitializeComponent();
 
-            waifu2xExePath = Path.Combine(Environment.CurrentDirectory, "waifu2x-ncnn-vulkan\\waifu2x-ncnn-vulkan.exe");
-            if (!File.Exists(waifu2xExePath))
-            {
-                waifu2xExePath = null;
-            }
-            else
-            {
-                BTN_waifu2x.Text = waifu2xExePath;
-                BTN_waifu2x.Enabled = false;
-            }
+            previewRefreshTimer.Tick += (s, ev) => { previewRefreshTimer.Stop(); StartPreviewRefresh(); };
+            previewSpinnerTimer.Tick += (s, ev) => { previewSpinnerAngle = (previewSpinnerAngle + 24) % 360; PIC_ResultPreview.Invalidate(); };
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -65,6 +78,29 @@ namespace ScannedCardDenoiser
             this.FormClosing += (s, args) => SaveSettings();
 
             UpdateTBResize();
+
+            // 설정 복원이 끝난 뒤에 값 변경 → 프리뷰 자동 갱신 이벤트를 건다(복원 중 갱신 폭주 방지).
+            HookPreviewRefreshEvents();
+            SchedulePreviewRefresh();
+        }
+
+        // 이미지 결과에 영향을 주는 모든 컨트롤(이미지 보정/편집 그룹)의 값 변경 시 프리뷰를 자동 갱신한다.
+        private void HookPreviewRefreshEvents()
+        {
+            void hook(Control c)
+            {
+                switch (c)
+                {
+                    case CheckBox cb: cb.CheckedChanged += (s, e) => SchedulePreviewRefresh(); break;
+                    case RadioButton rb: rb.CheckedChanged += (s, e) => SchedulePreviewRefresh(); break;
+                    case TextBox tb: tb.TextChanged += (s, e) => SchedulePreviewRefresh(); break;
+                    case TrackBar tr: tr.ValueChanged += (s, e) => SchedulePreviewRefresh(); break;
+                }
+                foreach (Control child in c.Controls)
+                    hook(child);
+            }
+            hook(groupBox1);
+            hook(groupBox2);
         }
 
         // 각 컨트롤에 마우스를 올리면 나오는 도움말(툴팁)을 설정한다.
@@ -140,22 +176,11 @@ namespace ScannedCardDenoiser
             toolTip1.SetToolTip(TB_CornerRounding, "라운딩 반경(짧은 변 대비 %).");
             toolTip1.SetToolTip(CB_EdgeLine, "카드 가장자리에 검은 테두리 선을 그립니다.");
 
-            // waifu2x
-            toolTip1.SetToolTip(CB_waifu2x, "처리 후 waifu2x로 업스케일/노이즈 제거를 추가로 실행합니다.");
-            toolTip1.SetToolTip(BTN_waifu2x, "waifu2x-ncnn-vulkan.exe 실행 파일 위치를 지정합니다.");
-            toolTip1.SetToolTip(CB_Waifu2xTTA, "TTA 모드: 품질이 조금 오르지만 처리 시간이 크게 늘어납니다.");
-            toolTip1.SetToolTip(RB_WaifuCunet, "CUNet 모델(일반적으로 일러스트/카드에 무난).");
-            toolTip1.SetToolTip(RB_WaifuAnime, "애니메이션 스타일용 모델.");
-            toolTip1.SetToolTip(RB_WaifuPhoto, "사진용 모델.");
-            toolTip1.SetToolTip(RB_WaifuLow, "노이즈 제거 레벨: 낮음.");
-            toolTip1.SetToolTip(RB_WaifuMed, "노이즈 제거 레벨: 중간.");
-            toolTip1.SetToolTip(RB_WaifuHigh, "노이즈 제거 레벨: 높음.");
-            toolTip1.SetToolTip(RB_WaifuHighest, "노이즈 제거 레벨: 최고.");
-
             // 실행/미리보기
+            toolTip1.SetToolTip(BTN_SetPoints, "Manual 보정에 사용할 코너 포인트를 다이얼로그로 지정합니다.\n원본 이미지가 바뀌면 초기화됩니다.");
             toolTip1.SetToolTip(BTN_Execute, "설정한 옵션으로 전체 처리를 시작합니다.");
             toolTip1.SetToolTip(BTN_Abort, "진행 중인 처리를 중단합니다.");
-            toolTip1.SetToolTip(BTN_ShowPreview, "현재 원본과 옵션으로 한 장을 처리해 미리보기 창에 보여줍니다.");
+            toolTip1.SetToolTip(BTN_ShowPreview, "현재 원본과 옵션으로 한 장을 처리해 결과 창을 띄웁니다.\n결과 창에서는 원본|결과가 겹쳐 있고 분할선을 드래그해 비교할 수 있습니다.");
         }
 
         // 현재 폼의 모든 보정 옵션을 한 문자열로 직렬화해 사용자 설정에 저장한다.
@@ -193,11 +218,6 @@ namespace ScannedCardDenoiser
                 "CornerRounding=" + CB_CornerRounding.Checked,
                 "CornerRadius=" + TB_CornerRounding.Text,
                 "EdgeLine=" + CB_EdgeLine.Checked,
-                // waifu2x
-                "Waifu2x=" + CB_waifu2x.Checked,
-                "Waifu2xTTA=" + CB_Waifu2xTTA.Checked,
-                "WaifuModel=" + (RB_WaifuCunet.Checked ? "Cunet" : RB_WaifuAnime.Checked ? "Anime" : "Photo"),
-                "WaifuLevel=" + (RB_WaifuLow.Checked ? "Low" : RB_WaifuMed.Checked ? "Med" : RB_WaifuHigh.Checked ? "High" : "Highest"),
                 // misc
                 "SubFolder=" + CB_SubFolder.Checked,
                 "Overwrite=" + CB_Overwrite.Checked,
@@ -275,21 +295,6 @@ namespace ScannedCardDenoiser
             setText("CornerRadius", TB_CornerRounding);
             setBool("EdgeLine", CB_EdgeLine);
 
-            setBool("Waifu2x", CB_waifu2x);
-            setBool("Waifu2xTTA", CB_Waifu2xTTA);
-            if (map.TryGetValue("WaifuModel", out string waifuModel))
-            {
-                RB_WaifuCunet.Checked = waifuModel == "Cunet";
-                RB_WaifuAnime.Checked = waifuModel == "Anime";
-                RB_WaifuPhoto.Checked = waifuModel == "Photo";
-            }
-            if (map.TryGetValue("WaifuLevel", out string waifuLevel))
-            {
-                RB_WaifuLow.Checked = waifuLevel == "Low";
-                RB_WaifuMed.Checked = waifuLevel == "Med";
-                RB_WaifuHigh.Checked = waifuLevel == "High";
-                RB_WaifuHighest.Checked = waifuLevel == "Highest";
-            }
 
             setBool("SubFolder", CB_SubFolder);
             setBool("Overwrite", CB_Overwrite);
@@ -458,12 +463,6 @@ namespace ScannedCardDenoiser
 
         private void BTN_Execute_Click(object sender, EventArgs e)
         {
-            if (CB_waifu2x.Checked && waifu2xExePath == null)
-            {
-                if (!LinkWaifu2X())
-                    return;
-            }
-
             // 이번 실행에 입력한 경로와 보정 옵션을 다음 실행을 위해 저장
             SaveSettings();
 
@@ -499,6 +498,38 @@ namespace ScannedCardDenoiser
         {
             UpdateExecuteButton();
             UpdatePreviewButton();
+
+            // 원본 이미지가 바뀌면 Manual 코너 포인트를 초기화하고 프리뷰를 다시 만든다.
+            previewManualPoints = null;
+            previewPointsFile = null;
+            SchedulePreviewRefresh();
+        }
+
+        // Manual 코너 포인트를 다이얼로그로 지정한다(프리뷰/단건 처리에 사용).
+        private void BTN_SetPoints_Click(object sender, EventArgs e)
+        {
+            string file = GetPreviewSourceFile();
+            if (file == null)
+            {
+                System.Windows.Forms.MessageBox.Show("원본 이미지(파일 또는 폴더)를 먼저 지정하세요.", "포인트 지정");
+                return;
+            }
+
+            bool bSizeByPixel = CB_ChangeSize.Checked && !RB_ResizePercent.Checked;
+            int desireLong = bSizeByPixel ? ParseInt(TB_ResizeW.Text) : 0;
+            int desireShort = bSizeByPixel ? ParseInt(TB_ResizeH.Text) : 0;
+
+            using (CamScanForm cam = new CamScanForm(file, desireLong, desireShort, ParseInt(TB_AdjThreshold.Text)))
+            {
+                if (cam.ShowDialog() == DialogResult.OK)
+                {
+                    previewManualPoints = cam.QuadPoints;
+                    previewPointsFile = file;
+                    SchedulePreviewRefresh();
+                }
+                cam.result?.Dispose();
+                cam.result = null;
+            }
         }
 
         private void UpdateExecuteButton()
@@ -757,8 +788,11 @@ namespace ScannedCardDenoiser
             if (!File.Exists(filepath))
                 return null;
 
-            PipelineContext ctx = BuildPipelineContext(filepath);
+            return RunPipeline(BuildPipelineContext(filepath));
+        }
 
+        private Mat RunPipeline(PipelineContext ctx)
+        {
             // Order: Load -> Denoise -> Brightness -> AutoLevel -> Sharpen -> AreaAdjust -> Resize -> Clip
             IImageStep[] steps =
             {
@@ -795,7 +829,7 @@ namespace ScannedCardDenoiser
                 Manual = RB_ManualAdjust.Checked,
                 Auto = RB_AutoAdjust.Checked,
                 AdjThresholdOffset = ParseInt(TB_AdjThreshold.Text),
-                ManualPoints = (manualPointsMap != null && manualPointsMap.TryGetValue(filepath, out ManualQuadPoints mp)) ? mp : null,
+                ManualPoints = GetManualPointsFor(filepath),
                 ChangeSize = CB_ChangeSize.Checked,
                 ResizePercent = RB_ResizePercent.Checked,
                 ResizeW = ParseInt(TB_ResizeW.Text),
@@ -829,6 +863,16 @@ namespace ScannedCardDenoiser
             return v;
         }
 
+        // Manual 코너 포인트 조회: 배치 수집 맵 → '포인트 지정' 버튼으로 설정한 미리보기 포인트 순.
+        private ManualQuadPoints GetManualPointsFor(string filepath)
+        {
+            if (manualPointsMap != null && manualPointsMap.TryGetValue(filepath, out ManualQuadPoints mp))
+                return mp;
+            if (previewManualPoints != null && string.Equals(previewPointsFile, filepath, StringComparison.OrdinalIgnoreCase))
+                return previewManualPoints;
+            return null;
+        }
+
         private void Process(string filepath, string dstDirectory)
         {
             Label_FileName.Invoke(new Action(() => 
@@ -850,66 +894,379 @@ namespace ScannedCardDenoiser
                 File.Delete(newFileName);
             }
 
-            Cv2.ImWrite(newFileName, Result);            
+            Cv2.ImWrite(newFileName, Result);
 
-            if (CB_waifu2x.Checked)
-            {
-                Process ps = new Process();
-
-                ps.StartInfo.FileName = waifu2xExePath;
-                ps.StartInfo.CreateNoWindow = true;
-                ps.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-
-                string modelPath = " -m ";
-                if (RB_WaifuAnime.Checked)
-                    modelPath += "models-upconv_7_anime_style_art_rgb";
-                else if (RB_WaifuPhoto.Checked)
-                    modelPath += "models-upconv_7_photo";
-                else if (RB_WaifuCunet.Checked)
-                    modelPath += "models-cunet";
-
-                string denoiseLevel = " -n ";
-                if (RB_WaifuLow.Checked)
-                    denoiseLevel += "0";
-                else if (RB_WaifuMed.Checked)
-                    denoiseLevel += "1";
-                else if (RB_WaifuHigh.Checked)
-                    denoiseLevel += "2";
-                else if (RB_WaifuHighest.Checked)
-                    denoiseLevel += "3";
-
-                ps.StartInfo.Arguments = "-i " + newFileName + " -o " + newFileName + modelPath + denoiseLevel + " -s 2";
-
-                if (CB_Waifu2xTTA.Checked)
-                    ps.StartInfo.Arguments += " -x";
-
-                ps.Start();
-                ps.WaitForExit();
-
-                if (File.Exists(newFileName))
-                {
-                    Image image = Image.FromFile(newFileName);
-                    System.Drawing.Size imageSize = image.Size;
-                    if(imageSize.Width != Result.Width)
-                        imageSize.Width = Result.Width;
-                    if (imageSize.Height != Result.Height)
-                        imageSize.Height = Result.Height;
-
-                    Bitmap newImage = new Bitmap(image, imageSize);
-                    image.Dispose();
-
-                    newImage.Save(newFileName, ImageFormat.Png);
-                    newImage.Dispose();
-                }
-                else
-                {
-                    ShowWarning(EErrorType.ErrorWaifu2x);
-                }
-
-                ps.Dispose();
-            }
+            // 방금 처리한 결과를 메인 폼 프리뷰에 반영(UI 스레드에서, Mat 해제 전에 동기 실행)
+            this.Invoke(new Action(() => UpdateResultPreview(Result)));
 
             Result.Dispose();
+        }
+
+        // ── 결과 프리뷰 ──
+        // 값 변경 시 디바운스(600ms) 후 백그라운드에서 파이프라인을 실행해 프리뷰를 갱신한다.
+        private void SchedulePreviewRefresh()
+        {
+            previewRefreshTimer.Stop();
+            previewRefreshTimer.Start();
+        }
+
+        // 프리뷰 대상 원본 파일: 파일이면 그 파일, 폴더면 첫 번째 이미지 파일.
+        private static readonly string[] PreviewImageExts = { ".jpg", ".jpeg", ".png", ".bmp" };
+        private string GetPreviewSourceFile()
+        {
+            string src = TB_Source.Text;
+            if (File.Exists(src))
+                return PreviewImageExts.Contains(Path.GetExtension(src).ToLowerInvariant()) ? src : null;
+            if (Directory.Exists(src))
+                return Directory.GetFiles(src, "*.*", SearchOption.TopDirectoryOnly)
+                    .FirstOrDefault(f => PreviewImageExts.Contains(Path.GetExtension(f).ToLowerInvariant()));
+            return null;
+        }
+
+        private void SetPreviewMessage(string msg, bool clearImages)
+        {
+            previewMessage = msg;
+            if (clearImages)
+            {
+                previewResultThumb?.Dispose(); previewResultThumb = null;
+                previewFullBmp?.Dispose(); previewFullBmp = null;
+                previewOrigFullBmp?.Dispose(); previewOrigFullBmp = null;
+                zoomOrigCrop?.Dispose(); zoomOrigCrop = null;
+                previewZoomCenter = new PointF(-1f, -1f);
+                Image oldZoom = PIC_ResultZoom.Image;
+                PIC_ResultZoom.Image = null;
+                oldZoom?.Dispose();
+            }
+            PIC_ResultPreview.Invalidate();
+        }
+
+        // 프리뷰 갱신 시작(UI 스레드). 파이프라인은 백그라운드 스레드에서 돌리고 스피너를 표시한다.
+        private void StartPreviewRefresh()
+        {
+            if (th != null && th.IsAlive)
+                return;   // 배치 실행 중에는 파일 처리 결과가 프리뷰를 갱신한다
+
+            string file = GetPreviewSourceFile();
+            if (file == null)
+            {
+                SetPreviewMessage(null, true);
+                return;
+            }
+
+            if (previewThread != null && previewThread.IsAlive)
+            {
+                previewRerun = true;   // 진행 중이면 끝난 뒤 한 번 더
+                return;
+            }
+
+            PipelineContext ctx = BuildPipelineContext(file);
+            // 줌 분할 비교용 '보정 전' 이미지: 색/노이즈 보정만 끄고 기하(영역/리사이즈/클립)는 동일하게.
+            PipelineContext origCtx = BuildPipelineContext(file);
+            origCtx.Denoise = false;
+            origCtx.BrightnessEnabled = false;
+            origCtx.AutoLevel = false;
+            origCtx.Sharpen = false;
+
+            // Manual인데 코너 포인트가 아직 없으면 Auto 검출 결과로 미리보기한다(다이얼로그 팝업 방지).
+            if (ctx.Manual && ctx.ManualPoints == null)
+            {
+                ctx.Manual = false; ctx.Auto = true;
+                origCtx.Manual = false; origCtx.Auto = true;
+            }
+
+            previewMessage = null;
+            previewBusy = true;
+            previewSpinnerTimer.Start();
+            PIC_ResultPreview.Invalidate();
+
+            previewThread = new Thread(() =>
+            {
+                Mat result = null, orig = null;
+                try
+                {
+                    result = RunPipeline(ctx);
+                    if (result != null)
+                        orig = RunPipeline(origCtx);
+                }
+                catch { /* 잘못된 설정 값 등으로 실패할 수 있다 */ }
+
+                try
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        previewBusy = false;
+                        previewSpinnerTimer.Stop();
+                        if (result != null)
+                        {
+                            UpdateResultPreview(result, orig);
+                            result.Dispose();
+                            orig?.Dispose();
+                        }
+                        else
+                        {
+                            SetPreviewMessage("미리보기 생성 실패 (설정 값을 확인하세요)", false);
+                        }
+                        PIC_ResultPreview.Invalidate();
+                        if (previewRerun)
+                        {
+                            previewRerun = false;
+                            SchedulePreviewRefresh();
+                        }
+                    }));
+                }
+                catch
+                {
+                    result?.Dispose();   // 폼이 닫히는 중이면 무시
+                    orig?.Dispose();
+                }
+            });
+            previewThread.IsBackground = true;
+            previewThread.Start();
+        }
+
+        // 처리 결과를 최대 300x300(비율 유지) 썸네일로 만들고,
+        // 클릭 줌용 전체 해상도 비트맵(+분할 비교용 보정 전 이미지)을 보관한다. UI 스레드에서 호출할 것.
+        private void UpdateResultPreview(Mat result, Mat origResult = null)
+        {
+            if (result == null || result.Empty())
+                return;
+
+            Bitmap full = MatToBitmap(result);
+
+            double scale = Math.Min(1.0, Math.Min(300.0 / full.Width, 300.0 / full.Height));
+            int tw = Math.Max(1, (int)Math.Round(full.Width * scale));
+            int th = Math.Max(1, (int)Math.Round(full.Height * scale));
+            Bitmap thumb = new Bitmap(full, tw, th);
+
+            previewFullBmp?.Dispose();
+            previewFullBmp = full;
+            previewOrigFullBmp?.Dispose();
+            previewOrigFullBmp = (origResult != null && !origResult.Empty()) ? MatToBitmap(origResult) : null;
+            previewResultThumb?.Dispose();
+            previewResultThumb = thumb;
+            previewMessage = null;
+
+            // 줌 뷰는 초기화하지 않고, 보고 있던 위치를 새 결과로 다시 크롭해 함께 갱신한다.
+            RefreshZoomView();
+
+            PIC_ResultPreview.Invalidate();
+        }
+
+        // Mat(1/3/4채널) → 32bppArgb Bitmap. 파이프라인의 4채널 데이터는 BGRA 순서라 그대로 복사한다.
+        private static Bitmap MatToBitmap(Mat m)
+        {
+            Mat src = m;
+            Mat converted = null;
+            if (m.Channels() == 3)
+            {
+                converted = new Mat();
+                Cv2.CvtColor(m, converted, ColorConversionCodes.BGR2BGRA);
+                src = converted;
+            }
+            else if (m.Channels() == 1)
+            {
+                converted = new Mat();
+                Cv2.CvtColor(m, converted, ColorConversionCodes.GRAY2BGRA);
+                src = converted;
+            }
+
+            Bitmap bmp = new Bitmap(src.Cols, src.Rows, PixelFormat.Format32bppArgb);
+            BitmapData bd = bmp.LockBits(
+                new System.Drawing.Rectangle(0, 0, src.Cols, src.Rows),
+                ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+            int rowBytes = src.Cols * 4;
+            byte[] row = new byte[rowBytes];
+            for (int y = 0; y < src.Rows; y++)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(src.Ptr(y), row, 0, rowBytes);
+                System.Runtime.InteropServices.Marshal.Copy(row, 0, System.IntPtr.Add(bd.Scan0, y * bd.Stride), rowBytes);
+            }
+            bmp.UnlockBits(bd);
+            converted?.Dispose();
+            return bmp;
+        }
+
+        private void PIC_ResultPreview_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (previewResultThumb == null)
+                return;
+            previewHover = e.Location;
+            PIC_ResultPreview.Invalidate();
+        }
+
+        private void PIC_ResultPreview_MouseLeave(object sender, EventArgs e)
+        {
+            previewHover = new System.Drawing.Point(-1, -1);
+            PIC_ResultPreview.Invalidate();
+        }
+
+        // 썸네일 그리기: 결과 이미지 + (호버 시) 줌 뷰가 1:1로 보여줄 수 있는 영역만큼의 프레임,
+        // 갱신 중에는 중앙에 프로그레스 서클을 표시한다.
+        private void PIC_ResultPreview_Paint(object sender, PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+
+            if (previewResultThumb != null)
+            {
+                g.DrawImage(previewResultThumb, 0, 0, previewResultThumb.Width, previewResultThumb.Height);
+
+                bool hoverIn = previewHover.X >= 0
+                    && previewHover.X < previewResultThumb.Width
+                    && previewHover.Y < previewResultThumb.Height;
+
+                if (hoverIn)
+                {
+                    // 프레임 크기 = PIC_ResultZoom이 실제 해상도(1:1)로 보여줄 수 있는 최대 영역의 썸네일 환산 크기
+                    System.Drawing.Size f = GetHoverFrameSize();
+                    using (Pen pen = new Pen(Color.Red, 1f))
+                        g.DrawRectangle(pen, previewHover.X - f.Width / 2, previewHover.Y - f.Height / 2, f.Width, f.Height);
+                }
+            }
+
+            if (previewMessage != null)
+            {
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                using (SolidBrush br = new SolidBrush(Color.DimGray))
+                    g.DrawString(previewMessage, this.Font, br, PIC_ResultPreview.ClientRectangle, sf);
+            }
+
+            if (previewBusy)
+            {
+                // 갱신 중 프로그레스 서클(스피너)
+                System.Drawing.Rectangle rc = PIC_ResultPreview.ClientRectangle;
+                int r = 18;
+                System.Drawing.Rectangle arc = new System.Drawing.Rectangle(rc.Width / 2 - r, rc.Height / 2 - r, 2 * r, 2 * r);
+                System.Drawing.Drawing2D.SmoothingMode oldMode = g.SmoothingMode;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (SolidBrush dim = new SolidBrush(Color.FromArgb(90, Color.White)))
+                    g.FillRectangle(dim, rc);
+                using (Pen ring = new Pen(Color.FromArgb(60, Color.SteelBlue), 5f))
+                    g.DrawEllipse(ring, arc);
+                using (Pen head = new Pen(Color.SteelBlue, 5f))
+                    g.DrawArc(head, arc, previewSpinnerAngle, 100);
+                g.SmoothingMode = oldMode;
+            }
+        }
+
+        // 호버 프레임 크기: 줌 뷰 크기(실제 해상도 픽셀)를 썸네일 좌표로 환산한다.
+        private System.Drawing.Size GetHoverFrameSize()
+        {
+            if (previewResultThumb == null || previewFullBmp == null)
+                return new System.Drawing.Size(10, 10);
+
+            int fw = (int)Math.Round((double)PIC_ResultZoom.ClientSize.Width * previewResultThumb.Width / previewFullBmp.Width);
+            int fh = (int)Math.Round((double)PIC_ResultZoom.ClientSize.Height * previewResultThumb.Height / previewFullBmp.Height);
+            fw = Math.Max(6, Math.Min(previewResultThumb.Width, fw));
+            fh = Math.Max(6, Math.Min(previewResultThumb.Height, fh));
+            return new System.Drawing.Size(fw, fh);
+        }
+
+        // 클릭: 클릭 지점을 상대 좌표로 기억하고 줌 뷰를 갱신한다.
+        // (상대 좌표라 이후 썸네일이 갱신돼도 같은 지점을 계속 보여준다)
+        private void PIC_ResultPreview_MouseClick(object sender, MouseEventArgs e)
+        {
+            Image thumb = previewResultThumb;
+            if (thumb == null || previewFullBmp == null)
+                return;
+            if (e.X >= thumb.Width || e.Y >= thumb.Height)
+                return;
+
+            previewZoomCenter = new PointF((float)e.X / thumb.Width, (float)e.Y / thumb.Height);
+            RefreshZoomView();
+        }
+
+        // 기억해 둔 상대 좌표를 현재 결과(previewFullBmp)에 적용해, 줌 뷰가 담을 수 있는
+        // 최대 영역을 실제 해상도(1:1)로 잘라 표시한다.
+        private void RefreshZoomView()
+        {
+            if (previewZoomCenter.X < 0 || previewFullBmp == null)
+                return;
+
+            int cw = Math.Min(previewFullBmp.Width, PIC_ResultZoom.ClientSize.Width);
+            int ch = Math.Min(previewFullBmp.Height, PIC_ResultZoom.ClientSize.Height);
+            int cx = (int)Math.Round(previewZoomCenter.X * previewFullBmp.Width) - cw / 2;
+            int cy = (int)Math.Round(previewZoomCenter.Y * previewFullBmp.Height) - ch / 2;
+            cx = Math.Max(0, Math.Min(previewFullBmp.Width - cw, cx));
+            cy = Math.Max(0, Math.Min(previewFullBmp.Height - ch, cy));
+
+            Bitmap crop = new Bitmap(cw, ch, PixelFormat.Format32bppArgb);
+            using (Graphics g = Graphics.FromImage(crop))
+                g.DrawImage(previewFullBmp,
+                    new System.Drawing.Rectangle(0, 0, cw, ch),
+                    new System.Drawing.Rectangle(cx, cy, cw, ch),
+                    GraphicsUnit.Pixel);
+
+            // 분할 비교용 원본 크롭(같은 영역). 크기가 결과와 다르면(설정 불일치) 비교를 끈다.
+            zoomOrigCrop?.Dispose();
+            zoomOrigCrop = null;
+            if (previewOrigFullBmp != null
+                && previewOrigFullBmp.Width == previewFullBmp.Width
+                && previewOrigFullBmp.Height == previewFullBmp.Height)
+            {
+                zoomOrigCrop = new Bitmap(cw, ch, PixelFormat.Format32bppArgb);
+                using (Graphics g = Graphics.FromImage(zoomOrigCrop))
+                    g.DrawImage(previewOrigFullBmp,
+                        new System.Drawing.Rectangle(0, 0, cw, ch),
+                        new System.Drawing.Rectangle(cx, cy, cw, ch),
+                        GraphicsUnit.Pixel);
+            }
+            PIC_ResultZoom.Cursor = zoomOrigCrop != null ? Cursors.VSplit : Cursors.Default;
+
+            Image oldZoom = PIC_ResultZoom.Image;
+            PIC_ResultZoom.Image = crop;
+            oldZoom?.Dispose();
+            PIC_ResultZoom.Invalidate();
+        }
+
+        // 줌 뷰 분할 비교: 분할선 왼쪽 = 보정 전(기하만 적용), 오른쪽 = 결과. 드래그로 위치 조절.
+        private void PIC_ResultZoom_Paint(object sender, PaintEventArgs e)
+        {
+            Image img = PIC_ResultZoom.Image;
+            if (img == null || zoomOrigCrop == null)
+                return;
+
+            int offX = (PIC_ResultZoom.ClientSize.Width - img.Width) / 2;
+            int offY = (PIC_ResultZoom.ClientSize.Height - img.Height) / 2;
+            int split = Math.Max(0, Math.Min(img.Width, (int)Math.Round(img.Width * zoomSplitFrac)));
+
+            if (split > 0)
+                e.Graphics.DrawImage(zoomOrigCrop,
+                    new System.Drawing.Rectangle(offX, offY, split, img.Height),
+                    new System.Drawing.Rectangle(0, 0, split, img.Height),
+                    GraphicsUnit.Pixel);
+
+            using (Pen div = new Pen(Color.Yellow, 1.5f))
+                e.Graphics.DrawLine(div, offX + split, offY, offX + split, offY + img.Height);
+        }
+
+        private void PIC_ResultZoom_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && zoomOrigCrop != null)
+            {
+                zoomSplitDrag = true;
+                UpdateZoomSplit(e.X);
+            }
+        }
+
+        private void PIC_ResultZoom_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (zoomSplitDrag)
+                UpdateZoomSplit(e.X);
+        }
+
+        private void PIC_ResultZoom_MouseUp(object sender, MouseEventArgs e)
+        {
+            zoomSplitDrag = false;
+        }
+
+        private void UpdateZoomSplit(int x)
+        {
+            Image img = PIC_ResultZoom.Image;
+            if (img == null)
+                return;
+            int offX = (PIC_ResultZoom.ClientSize.Width - img.Width) / 2;
+            zoomSplitFrac = Math.Max(0.0, Math.Min(1.0, (double)(x - offX) / Math.Max(1, img.Width)));
+            PIC_ResultZoom.Invalidate();
         }
 
         private void UpdatePreviewButton()
@@ -925,6 +1282,15 @@ namespace ScannedCardDenoiser
 
         private void BTN_ShowPreview_Click(object sender, EventArgs e)
         {
+            // Manual인데 코너 포인트가 없으면 결과/비교용 원본 두 번 모두 다이얼로그가 뜨게 되므로
+            // '포인트 지정' 버튼으로 먼저 지정하도록 안내한다.
+            if (RB_ManualAdjust.Checked && GetManualPointsFor(TB_Source.Text) == null)
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "Manual 보정은 '포인트 지정' 버튼으로 코너 포인트를 먼저 지정하세요.", "Show Result");
+                return;
+            }
+
             string Title = "";
             if (CB_ChangeSize.Checked)
             {
@@ -970,140 +1336,29 @@ namespace ScannedCardDenoiser
                 return;
             }                
 
-            if (CB_waifu2x.Checked)
+            // 원본과 결과를 한 창에 겹쳐 놓고 분할 슬라이더(드래그)로 비교한다.
+            // 비교용 '원본'은 색/노이즈 보정 없이 기하(영역 보정 + 리사이즈 + 모서리 크롭)만 적용해
+            // 결과와 픽셀 위치가 정확히 대응되도록 만든다. 썸네일/줌 프리뷰에도 함께 반영한다.
+            Bitmap origBmp = null;
             {
-                if (waifu2xExePath == null)
+                PipelineContext origCtx = BuildPipelineContext(TB_Source.Text);
+                origCtx.Denoise = false;
+                origCtx.BrightnessEnabled = false;
+                origCtx.AutoLevel = false;
+                origCtx.Sharpen = false;
+                Mat origMat = RunPipeline(origCtx);
+                UpdateResultPreview(tmpImage, origMat);
+                if (origMat != null)
                 {
-                    if (!LinkWaifu2X())
-                    {
-                        ShowWarning();
-                        return;
-                    }
+                    origBmp = MatToBitmap(origMat);
+                    origMat.Dispose();
                 }
-
-                string tmpFileName = "PreviewTemp.png";
-
-                Cv2.ImWrite("PreviewTemp.png", tmpImage); 
-
-                Process ps = new Process();
-                ps.StartInfo.FileName = waifu2xExePath;
-                ps.StartInfo.CreateNoWindow = true;
-                ps.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-
-                string modelPath = " -m ";
-                if (RB_WaifuAnime.Checked)
-                {
-                    modelPath += "models-upconv_7_anime_style_art_rgb";
-                    Title += "[waifu2x : upconv7_anim / ";
-                }
-                else if (RB_WaifuPhoto.Checked)
-                {
-                    modelPath += "models-upconv_7_photo";
-                    Title += "[waifu2x : upconv7_photo / ";
-                }
-                else if (RB_WaifuCunet.Checked)
-                {
-                    modelPath += "models-cunet";
-                    Title += "[waifu2x : upconv7_cunet / ";
-                }
-                 
-                string denoiseLevel = " -n ";
-                if (RB_WaifuLow.Checked)
-                {
-                    denoiseLevel += "0";
-                    Title += "Denoise Low]";
-                }
-                else if (RB_WaifuMed.Checked)
-                {
-                    denoiseLevel += "1";
-                    Title += "Denoise Medium]";
-                }
-                else if (RB_WaifuHigh.Checked)
-                {
-                    denoiseLevel += "2";
-                    Title += "Denoise High]";
-                }
-                else if (RB_WaifuHighest.Checked)
-                {
-                    denoiseLevel += "3";
-                    Title += "Denoise Highest]";
-                }
-
-                ps.StartInfo.Arguments = "-i " + tmpFileName + " -o " + tmpFileName + modelPath + denoiseLevel + " -s 2";
-
-                ps.Start();
-                ps.WaitForExit();
-
-                if (File.Exists(tmpFileName))
-                {
-                    Image image = Image.FromFile(tmpFileName);
-                    System.Drawing.Size imageSize = image.Size;
-                    if (imageSize.Width != tmpImage.Width)
-                        imageSize.Width = tmpImage.Width;
-                    if (imageSize.Height != tmpImage.Height)
-                        imageSize.Height = tmpImage.Height;
-
-                    Bitmap newImage = new Bitmap(image, imageSize);
-                    image.Dispose();
-
-                    newImage.Save(tmpFileName, ImageFormat.Png);
-                    newImage.Dispose();
-
-                    tmpImage = Cv2.ImRead(tmpFileName);
-
-                    File.Delete(tmpFileName);
-                }
-                else
-                {
-                    ShowWarning(EErrorType.ErrorWaifu2x);
-                }
-
-                ps.Dispose();
             }
-
-            // 원본(좌)과 결과(우)를 각각 별도 창으로 띄우고, 화면 작업영역을 좌/우로 나눠 나란히 배치한다.
             System.Drawing.Rectangle wa = Screen.PrimaryScreen.WorkingArea;
-            int halfW = wa.Width / 2;
-            using (Mat original = Cv2.ImRead(TB_Source.Text))
-            {
-                ShowPreviewWindow("Original (Before)", original, new System.Drawing.Rectangle(wa.Left, wa.Top, halfW, wa.Height));
-            }
-            ShowPreviewWindow("Result (After)  " + Title, tmpImage, new System.Drawing.Rectangle(wa.Left + halfW, wa.Top, wa.Width - halfW, wa.Height));
+            System.Drawing.Rectangle bounds = new System.Drawing.Rectangle(
+                wa.Left + wa.Width / 8, wa.Top, wa.Width * 3 / 4, wa.Height);
+            ShowPreviewWindow("Result (원본 | 결과)  " + Title, tmpImage, bounds, origBmp);
             tmpImage.Dispose();
-        }
-
-        private void CB_waifu2x_CheckedChanged(object sender, EventArgs e)
-        {
-            RB_WaifuAnime.Enabled = CB_waifu2x.Checked;
-            RB_WaifuPhoto.Enabled = CB_waifu2x.Checked;
-            RB_WaifuCunet.Enabled = CB_waifu2x.Checked;
-            RB_WaifuLow.Enabled = CB_waifu2x.Checked;
-            RB_WaifuMed.Enabled = CB_waifu2x.Checked;
-            RB_WaifuHigh.Enabled = CB_waifu2x.Checked;
-            RB_WaifuHighest.Enabled = CB_waifu2x.Checked;
-            CB_Waifu2xTTA.Enabled = CB_waifu2x.Checked;
-        }
-
-        private void BTN_waifu2x_Click(object sender, EventArgs e)
-        {
-            LinkWaifu2X();
-        }
-
-        private bool LinkWaifu2X()
-        {
-            OpenFileDialog openFileDialog1 = new OpenFileDialog();
-            openFileDialog1.InitialDirectory = Environment.CurrentDirectory;
-            openFileDialog1.Filter = "waifu2x exe file|waifu2x-ncnn-vulkan.exe";
-            openFileDialog1.FilterIndex = 2;
-            openFileDialog1.RestoreDirectory = true;
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
-            {
-                waifu2xExePath = openFileDialog1.FileName;
-                BTN_waifu2x.Text = waifu2xExePath;
-                return true;
-            }
-
-            return false;
         }
 
         private void TB_OnlyDigit_KeyPressed(object sender, KeyPressEventArgs e)
@@ -1125,7 +1380,6 @@ namespace ScannedCardDenoiser
             switch(Err)
             {
                 case EErrorType.WrongProperty: System.Windows.Forms.MessageBox.Show("설정 값을 확인하세요.", "경고"); break;
-                case EErrorType.ErrorWaifu2x: System.Windows.Forms.MessageBox.Show("waifu2x 실행 실패", "경고"); break;
             }
             
         }
@@ -1134,6 +1388,7 @@ namespace ScannedCardDenoiser
         {
             // Threshold는 Auto 크롭과 Manual 초기 4포인트 검출에 모두 쓰이므로 두 모드에서 활성화.
             TB_AdjThreshold.Enabled = RB_AutoAdjust.Checked || RB_ManualAdjust.Checked;
+            BTN_SetPoints.Enabled = RB_ManualAdjust.Checked;
         }
 
         private void TB_Brightness_Scroll(object sender, EventArgs e)
@@ -1152,8 +1407,9 @@ namespace ScannedCardDenoiser
             ShowPreviewWindow(title, mat, System.Drawing.Rectangle.Empty);
         }
 
-        // bounds가 비어있지 않으면 그 위치/크기로 창을 배치한다(좌/우 나란히 비교용).
-        private void ShowPreviewWindow(string title, Mat mat, System.Drawing.Rectangle bounds)
+        // bounds가 비어있지 않으면 그 위치/크기로 창을 배치한다.
+        // compare가 있으면 원본|결과를 겹쳐 분할 슬라이더로 비교하는 창이 된다(compare 소유권은 창으로 이전).
+        private void ShowPreviewWindow(string title, Mat mat, System.Drawing.Rectangle bounds, Bitmap compare = null)
         {
             byte[] buf;
             Cv2.ImEncode(".png", mat, out buf);
@@ -1161,7 +1417,7 @@ namespace ScannedCardDenoiser
             using (System.IO.MemoryStream ms = new System.IO.MemoryStream(buf))
             using (Bitmap tmp = new Bitmap(ms))
                 bmp = new Bitmap(tmp);
-            PreviewForm pf = new PreviewForm(title, bmp);
+            PreviewForm pf = new PreviewForm(title, bmp, compare);
             if (bounds != System.Drawing.Rectangle.Empty)
             {
                 pf.StartPosition = FormStartPosition.Manual;

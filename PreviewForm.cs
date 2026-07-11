@@ -5,6 +5,7 @@ using System.Windows.Forms;
 namespace ScannedCardDenoiser
 {
     // 큰 이미지를 창에 맞게 축소해 보여주고, 확대 슬라이더로 배율을 조절하는 프리뷰 창.
+    // compare(원본)를 넘기면 결과 위에 원본을 겹쳐, 세로 분할선을 드래그해 원본|결과를 비교한다.
     public class PreviewForm : Form
     {
         private readonly Panel panel;
@@ -14,10 +15,15 @@ namespace ScannedCardDenoiser
         private readonly Bitmap bmp;
         private readonly Size imgSize;
 
-        public PreviewForm(string title, Bitmap image)
+        private readonly Bitmap compareBmp;   // 분할 비교용 원본(null이면 단일 이미지 창)
+        private double splitFrac = 0.5;       // 분할선 위치(표시 폭 대비 0~1)
+        private bool splitDrag = false;
+
+        public PreviewForm(string title, Bitmap image, Bitmap compare = null)
         {
             bmp = image;
             imgSize = image.Size;
+            compareBmp = compare;
 
             Text = title;
             ClientSize = new Size(900, 720);
@@ -62,7 +68,55 @@ namespace ScannedCardDenoiser
                 ApplyZoom();
             };
             Shown += (s, e) => FitZoom();
-            FormClosed += (s, e) => { if (bmp != null) bmp.Dispose(); };
+            FormClosed += (s, e) =>
+            {
+                if (bmp != null) bmp.Dispose();
+                if (compareBmp != null) compareBmp.Dispose();
+            };
+
+            if (compareBmp != null)
+            {
+                // 분할 비교: 분할선을 잡고 드래그(혹은 클릭)해서 좌우 비율을 바꾼다.
+                pic.Cursor = Cursors.VSplit;
+                pic.Paint += Pic_PaintSplit;
+                pic.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { splitDrag = true; UpdateSplit(e.X); } };
+                pic.MouseMove += (s, e) => { if (splitDrag) UpdateSplit(e.X); };
+                pic.MouseUp += (s, e) => splitDrag = false;
+            }
+        }
+
+        private void UpdateSplit(int x)
+        {
+            splitFrac = Math.Max(0.0, Math.Min(1.0, (double)x / Math.Max(1, pic.Width)));
+            pic.Invalidate();
+        }
+
+        // 분할선 왼쪽 = 원본, 오른쪽 = 결과. 두 이미지는 각각 표시 크기에 맞게 늘려 겹친다.
+        private void Pic_PaintSplit(object sender, PaintEventArgs e)
+        {
+            int w = pic.Width, h = pic.Height;
+            int split = (int)Math.Round(w * splitFrac);
+
+            if (split > 0)
+            {
+                e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
+                e.Graphics.DrawImage(compareBmp,
+                    new Rectangle(0, 0, split, h),
+                    new RectangleF(0, 0, (float)(compareBmp.Width * splitFrac), compareBmp.Height),
+                    GraphicsUnit.Pixel);
+            }
+
+            using (Pen div = new Pen(Color.Yellow, 2f))
+                e.Graphics.DrawLine(div, split, 0, split, h);
+
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(140, Color.Black)))
+            using (SolidBrush tx = new SolidBrush(Color.White))
+            {
+                e.Graphics.FillRectangle(bg, 4, 4, 44, 20);
+                e.Graphics.DrawString("원본", Font, tx, 8, 7);
+                e.Graphics.FillRectangle(bg, w - 48, 4, 44, 20);
+                e.Graphics.DrawString("결과", Font, tx, w - 44, 7);
+            }
         }
 
         private void FitZoom()

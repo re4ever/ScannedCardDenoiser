@@ -166,6 +166,14 @@ namespace ScannedCardDenoiser
             LBL_Rotate.Text = "기울기: " + (TRB_Rotate.Value / 10.0).ToString("0.0") + "°";
         }
 
+        // 자동: Auto 검출(CardCornerDetector)을 다시 실행해 그 결과로 8개 포인트를 배치한다.
+        private void BTN_AutoPoints_Click(object sender, EventArgs e)
+        {
+            Cursor = Cursors.WaitCursor;
+            try { ApplyAutoPoints(); }
+            finally { Cursor = Cursors.Default; }
+        }
+
         // 리셋: 코너 4점을 표시 이미지의 네 끝(모서리)에 배치하고 중앙 4점/회전 기준도 함께 갱신한다.
         private void BTN_Reset_Click(object sender, EventArgs e)
         {
@@ -353,18 +361,72 @@ namespace ScannedCardDenoiser
         }
 
         // 사각형 가이드 라인(외곽 8 + 십자 2)을 그린다. lineWidth로 굵기 조절(돋보기 안에서는 1/배율).
-        private void DrawGuide(Graphics g, System.Drawing.Point basePoint, float lineWidth)
+        // splitByImage=true(돋보기 전용)면 외곽 라인을 이미지 안쪽 구간은 빨간색,
+        // 이미지 밖으로 벗어난 구간은 흰색으로 나눠 그린다. false면 전체 빨간색.
+        private void DrawGuide(Graphics g, System.Drawing.Point basePoint, float lineWidth, bool splitByImage = false)
         {
-            using (Pen pen = new Pen(Color.FromArgb(255, 255, 0, 0), lineWidth))
+            // 표시 이미지 영역(PIC_Main 클라이언트 좌표, CenterImage 기준)
+            float imgL = (PIC_Main.ClientSize.Width - PIC_Main.Image.Width) / 2f;
+            float imgT = (PIC_Main.ClientSize.Height - PIC_Main.Image.Height) / 2f;
+            float imgR = imgL + PIC_Main.Image.Width;
+            float imgB = imgT + PIC_Main.Image.Height;
+
+            // Liang-Barsky: 선분이 이미지 사각형 안에 있는 파라미터 구간 [t0,t1]을 구한다.
+            bool clip(float p, float q, ref float t0, ref float t1)
             {
-                g.DrawLine(pen, SubPoints(TopLeft.Location, basePoint), SubPoints(TopCenter.Location, basePoint));
-                g.DrawLine(pen, SubPoints(TopCenter.Location, basePoint), SubPoints(TopRight.Location, basePoint));
-                g.DrawLine(pen, SubPoints(TopLeft.Location, basePoint), SubPoints(CenterLeft.Location, basePoint));
-                g.DrawLine(pen, SubPoints(CenterLeft.Location, basePoint), SubPoints(BottomLeft.Location, basePoint));
-                g.DrawLine(pen, SubPoints(BottomLeft.Location, basePoint), SubPoints(BottomCenter.Location, basePoint));
-                g.DrawLine(pen, SubPoints(BottomCenter.Location, basePoint), SubPoints(BottomRight.Location, basePoint));
-                g.DrawLine(pen, SubPoints(BottomRight.Location, basePoint), SubPoints(CenterRight.Location, basePoint));
-                g.DrawLine(pen, SubPoints(CenterRight.Location, basePoint), SubPoints(TopRight.Location, basePoint));
+                if (Math.Abs(p) < 1e-6f)
+                    return q >= 0;
+                float r = q / p;
+                if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+                else { if (r < t0) return false; if (r < t1) t1 = r; }
+                return true;
+            }
+
+            using (Pen white = new Pen(Color.White, lineWidth))
+            using (Pen red = new Pen(Color.FromArgb(255, 255, 0, 0), lineWidth))
+            {
+                void edge(System.Drawing.Point pa, System.Drawing.Point pb)
+                {
+                    System.Drawing.Point a = SubPoints(pa, basePoint);
+                    System.Drawing.Point b = SubPoints(pb, basePoint);
+
+                    if (!splitByImage)
+                    {
+                        g.DrawLine(red, a, b);
+                        return;
+                    }
+
+                    float dx = b.X - a.X, dy = b.Y - a.Y;
+                    float t0 = 0f, t1 = 1f;
+                    bool inside =
+                        clip(-dx, a.X - imgL, ref t0, ref t1) &&
+                        clip(dx, imgR - a.X, ref t0, ref t1) &&
+                        clip(-dy, a.Y - imgT, ref t0, ref t1) &&
+                        clip(dy, imgB - a.Y, ref t0, ref t1);
+
+                    if (!inside)
+                    {
+                        g.DrawLine(white, a, b);   // 전 구간이 이미지 밖
+                        return;
+                    }
+
+                    PointF q0 = new PointF(a.X + dx * t0, a.Y + dy * t0);
+                    PointF q1 = new PointF(a.X + dx * t1, a.Y + dy * t1);
+                    if (t0 > 0f)
+                        g.DrawLine(white, a.X, a.Y, q0.X, q0.Y);
+                    g.DrawLine(red, q0, q1);
+                    if (t1 < 1f)
+                        g.DrawLine(white, q1.X, q1.Y, b.X, b.Y);
+                }
+
+                edge(TopLeft.Location, TopCenter.Location);
+                edge(TopCenter.Location, TopRight.Location);
+                edge(TopLeft.Location, CenterLeft.Location);
+                edge(CenterLeft.Location, BottomLeft.Location);
+                edge(BottomLeft.Location, BottomCenter.Location);
+                edge(BottomCenter.Location, BottomRight.Location);
+                edge(BottomRight.Location, CenterRight.Location);
+                edge(CenterRight.Location, TopRight.Location);
             }
             using (Pen pen2 = new Pen(Color.FromArgb(128, 255, 0, 0), lineWidth))
             {
@@ -471,10 +533,11 @@ namespace ScannedCardDenoiser
                 g.DrawImage(img, imgOffX, imgOffY, img.Width, img.Height);
 
                 // 확대 화면에도 가이드 라인을 함께 그린다(배율만큼 얇게 → 화면상 ~1px).
+                // 확대경 안에서만 이미지 밖 구간을 흰색으로 나눠 그린다.
                 System.Drawing.Point gbase = PIC_Main.Location;
                 gbase.X -= TopLeft.Size.Width / 2;
                 gbase.Y -= TopLeft.Size.Height / 2;
-                DrawGuide(g, gbase, 1f / Z);
+                DrawGuide(g, gbase, 1f / Z, true);
             }
             g.Restore(st);
 
@@ -482,10 +545,47 @@ namespace ScannedCardDenoiser
                 g.DrawEllipse(outer, lcx - R, lcy - R, 2 * R, 2 * R);
             using (Pen inner = new Pen(Color.White, 1.5f))
                 g.DrawEllipse(inner, lcx - R, lcy - R, 2 * R, 2 * R);
-            using (Pen cross = new Pen(Color.FromArgb(220, 255, 0, 0), 1.5f))
+
+            // 십자선: 이미지 영역 안 픽셀은 빨강, 벗어난 픽셀은 흰색.
+            // 이미지 사각형(PIC_Main 좌표)을 확대경 화면 좌표로 변환해 팔마다 구간을 나눈다.
+            float sL = lcx + (imgOffX - acx) * Z;
+            float sT = lcy + (imgOffY - acy) * Z;
+            float sR = lcx + (imgOffX + img.Width - acx) * Z;
+            float sB = lcy + (imgOffY + img.Height - acy) * Z;
+            using (Pen crossR = new Pen(Color.FromArgb(220, 255, 0, 0), 1.5f))
+            using (Pen crossW = new Pen(Color.FromArgb(220, 255, 255, 255), 1.5f))
             {
-                g.DrawLine(cross, lcx - 12, lcy, lcx + 12, lcy);
-                g.DrawLine(cross, lcx, lcy - 12, lcx, lcy + 12);
+                float xa = lcx - 12, xb = lcx + 12;
+                if (lcy >= sT && lcy <= sB)
+                {
+                    float rl = Math.Max(xa, sL), rr = Math.Min(xb, sR);
+                    if (rr > rl)
+                    {
+                        if (rl > xa) g.DrawLine(crossW, xa, lcy, rl, lcy);
+                        g.DrawLine(crossR, rl, lcy, rr, lcy);
+                        if (rr < xb) g.DrawLine(crossW, rr, lcy, xb, lcy);
+                    }
+                    else
+                        g.DrawLine(crossW, xa, lcy, xb, lcy);
+                }
+                else
+                    g.DrawLine(crossW, xa, lcy, xb, lcy);
+
+                float ya = lcy - 12, yb = lcy + 12;
+                if (lcx >= sL && lcx <= sR)
+                {
+                    float rt = Math.Max(ya, sT), rb = Math.Min(yb, sB);
+                    if (rb > rt)
+                    {
+                        if (rt > ya) g.DrawLine(crossW, lcx, ya, lcx, rt);
+                        g.DrawLine(crossR, lcx, rt, lcx, rb);
+                        if (rb < yb) g.DrawLine(crossW, lcx, rb, lcx, yb);
+                    }
+                    else
+                        g.DrawLine(crossW, lcx, ya, lcx, yb);
+                }
+                else
+                    g.DrawLine(crossW, lcx, ya, lcx, yb);
             }
         }
 

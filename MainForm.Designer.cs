@@ -95,19 +95,9 @@
             this.BTN_Abort = new System.Windows.Forms.Button();
             this.CB_SubFolder = new System.Windows.Forms.CheckBox();
             this.BTN_ShowPreview = new System.Windows.Forms.Button();
-            this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.BTN_waifu2x = new System.Windows.Forms.Button();
-            this.groupBox6 = new System.Windows.Forms.GroupBox();
-            this.CB_Waifu2xTTA = new System.Windows.Forms.CheckBox();
-            this.RB_WaifuPhoto = new System.Windows.Forms.RadioButton();
-            this.RB_WaifuAnime = new System.Windows.Forms.RadioButton();
-            this.RB_WaifuCunet = new System.Windows.Forms.RadioButton();
-            this.CB_waifu2x = new System.Windows.Forms.CheckBox();
-            this.groupBox4 = new System.Windows.Forms.GroupBox();
-            this.RB_WaifuHighest = new System.Windows.Forms.RadioButton();
-            this.RB_WaifuHigh = new System.Windows.Forms.RadioButton();
-            this.RB_WaifuMed = new System.Windows.Forms.RadioButton();
-            this.RB_WaifuLow = new System.Windows.Forms.RadioButton();
+            this.BTN_SetPoints = new System.Windows.Forms.Button();
+            this.PIC_ResultPreview = new System.Windows.Forms.PictureBox();
+            this.PIC_ResultZoom = new System.Windows.Forms.PictureBox();
             this.Label_FileName = new System.Windows.Forms.Label();
             this.CB_Overwrite = new System.Windows.Forms.CheckBox();
             this.CB_PdfExtract = new System.Windows.Forms.CheckBox();
@@ -119,12 +109,11 @@
             this.TB_Sharpen = new System.Windows.Forms.TrackBar();
             ((System.ComponentModel.ISupportInitialize)(this.TB_Brightness)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.TB_Sharpen)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.PIC_ResultPreview)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.PIC_ResultZoom)).BeginInit();
             this.groupBox1.SuspendLayout();
             this.groupBox5.SuspendLayout();
             this.groupBox2.SuspendLayout();
-            this.groupBox3.SuspendLayout();
-            this.groupBox6.SuspendLayout();
-            this.groupBox4.SuspendLayout();
             this.SuspendLayout();
             // 
             // openFileDialog
@@ -249,6 +238,7 @@
             // 
             this.groupBox5.Controls.Add(this.RB_NoneAdjust);
             this.groupBox5.Controls.Add(this.TB_AdjThreshold);
+            this.groupBox5.Controls.Add(this.BTN_SetPoints);
             this.groupBox5.Controls.Add(this.RB_ManualAdjust);
             this.groupBox5.Controls.Add(this.RB_AutoAdjust);
             this.groupBox5.Controls.Add(this.label14);
@@ -285,11 +275,21 @@
             this.RB_ManualAdjust.AutoSize = true;
             this.RB_ManualAdjust.Location = new System.Drawing.Point(7, 62);
             this.RB_ManualAdjust.Name = "RB_ManualAdjust";
-            this.RB_ManualAdjust.Size = new System.Drawing.Size(153, 16);
+            this.RB_ManualAdjust.Size = new System.Drawing.Size(64, 16);
             this.RB_ManualAdjust.TabIndex = 12;
-            this.RB_ManualAdjust.Text = "Manual (Experimental)";
+            this.RB_ManualAdjust.Text = "Manual";
             this.RB_ManualAdjust.UseVisualStyleBackColor = true;
             this.RB_ManualAdjust.CheckedChanged += new System.EventHandler(this.RB_AutoAdjust_CheckedChanged);
+            //
+            // BTN_SetPoints
+            //
+            this.BTN_SetPoints.Location = new System.Drawing.Point(75, 58);
+            this.BTN_SetPoints.Name = "BTN_SetPoints";
+            this.BTN_SetPoints.Size = new System.Drawing.Size(85, 22);
+            this.BTN_SetPoints.TabIndex = 14;
+            this.BTN_SetPoints.Text = "포인트 지정";
+            this.BTN_SetPoints.UseVisualStyleBackColor = true;
+            this.BTN_SetPoints.Click += new System.EventHandler(this.BTN_SetPoints_Click);
             // 
             // RB_AutoAdjust
             // 
@@ -866,160 +866,39 @@
             this.BTN_ShowPreview.Name = "BTN_ShowPreview";
             this.BTN_ShowPreview.Size = new System.Drawing.Size(176, 28);
             this.BTN_ShowPreview.TabIndex = 13;
-            this.BTN_ShowPreview.Text = "Show Preview";
+            this.BTN_ShowPreview.Text = "Show Result";
             this.BTN_ShowPreview.UseVisualStyleBackColor = true;
             this.BTN_ShowPreview.Click += new System.EventHandler(this.BTN_ShowPreview_Click);
             //
-            // groupBox3
-            // 
-            this.groupBox3.Controls.Add(this.BTN_waifu2x);
-            this.groupBox3.Controls.Add(this.groupBox6);
-            this.groupBox3.Controls.Add(this.CB_waifu2x);
-            this.groupBox3.Controls.Add(this.groupBox4);
-            this.groupBox3.Location = new System.Drawing.Point(486, 105);
-            this.groupBox3.Name = "groupBox3";
-            this.groupBox3.Size = new System.Drawing.Size(264, 223);
-            this.groupBox3.TabIndex = 14;
-            this.groupBox3.TabStop = false;
-            this.groupBox3.Text = "waifu2x 디노이저";
-            // 
-            // BTN_waifu2x
-            // 
-            this.BTN_waifu2x.Location = new System.Drawing.Point(7, 39);
-            this.BTN_waifu2x.Name = "BTN_waifu2x";
-            this.BTN_waifu2x.Size = new System.Drawing.Size(251, 23);
-            this.BTN_waifu2x.TabIndex = 4;
-            this.BTN_waifu2x.Text = "waifu2x_ncnn_vulkan.exe 연결 필요";
-            this.BTN_waifu2x.UseVisualStyleBackColor = true;
-            this.BTN_waifu2x.Click += new System.EventHandler(this.BTN_waifu2x_Click);
-            // 
-            // groupBox6
-            // 
-            this.groupBox6.Controls.Add(this.CB_Waifu2xTTA);
-            this.groupBox6.Controls.Add(this.RB_WaifuPhoto);
-            this.groupBox6.Controls.Add(this.RB_WaifuAnime);
-            this.groupBox6.Controls.Add(this.RB_WaifuCunet);
-            this.groupBox6.Location = new System.Drawing.Point(7, 76);
-            this.groupBox6.Name = "groupBox6";
-            this.groupBox6.Size = new System.Drawing.Size(251, 84);
-            this.groupBox6.TabIndex = 3;
-            this.groupBox6.TabStop = false;
-            this.groupBox6.Text = "Model";
-            // 
-            // CB_Waifu2xTTA
-            // 
-            this.CB_Waifu2xTTA.AutoSize = true;
-            this.CB_Waifu2xTTA.Checked = true;
-            this.CB_Waifu2xTTA.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_Waifu2xTTA.Location = new System.Drawing.Point(156, 63);
-            this.CB_Waifu2xTTA.Name = "CB_Waifu2xTTA";
-            this.CB_Waifu2xTTA.Size = new System.Drawing.Size(88, 16);
-            this.CB_Waifu2xTTA.TabIndex = 1;
-            this.CB_Waifu2xTTA.Text = "TTA 활성화";
-            this.CB_Waifu2xTTA.UseVisualStyleBackColor = true;
-            // 
-            // RB_WaifuPhoto
-            // 
-            this.RB_WaifuPhoto.AutoSize = true;
-            this.RB_WaifuPhoto.Location = new System.Drawing.Point(6, 38);
-            this.RB_WaifuPhoto.Name = "RB_WaifuPhoto";
-            this.RB_WaifuPhoto.Size = new System.Drawing.Size(105, 16);
-            this.RB_WaifuPhoto.TabIndex = 0;
-            this.RB_WaifuPhoto.Text = "upconv7 photo";
-            this.RB_WaifuPhoto.UseVisualStyleBackColor = true;
-            // 
-            // RB_WaifuAnime
-            // 
-            this.RB_WaifuAnime.AutoSize = true;
-            this.RB_WaifuAnime.Checked = true;
-            this.RB_WaifuAnime.Location = new System.Drawing.Point(6, 16);
-            this.RB_WaifuAnime.Name = "RB_WaifuAnime";
-            this.RB_WaifuAnime.Size = new System.Drawing.Size(109, 16);
-            this.RB_WaifuAnime.TabIndex = 0;
-            this.RB_WaifuAnime.TabStop = true;
-            this.RB_WaifuAnime.Text = "upconv7 anime";
-            this.RB_WaifuAnime.UseVisualStyleBackColor = true;
-            // 
-            // RB_WaifuCunet
-            // 
-            this.RB_WaifuCunet.AutoSize = true;
-            this.RB_WaifuCunet.Location = new System.Drawing.Point(6, 62);
-            this.RB_WaifuCunet.Name = "RB_WaifuCunet";
-            this.RB_WaifuCunet.Size = new System.Drawing.Size(54, 16);
-            this.RB_WaifuCunet.TabIndex = 0;
-            this.RB_WaifuCunet.Text = "cunet";
-            this.RB_WaifuCunet.UseVisualStyleBackColor = true;
-            // 
-            // CB_waifu2x
-            // 
-            this.CB_waifu2x.AutoSize = true;
-            this.CB_waifu2x.Checked = true;
-            this.CB_waifu2x.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.CB_waifu2x.Location = new System.Drawing.Point(7, 19);
-            this.CB_waifu2x.Name = "CB_waifu2x";
-            this.CB_waifu2x.Size = new System.Drawing.Size(97, 16);
-            this.CB_waifu2x.TabIndex = 2;
-            this.CB_waifu2x.Text = "Use waifu2x ";
-            this.CB_waifu2x.UseVisualStyleBackColor = true;
-            this.CB_waifu2x.CheckedChanged += new System.EventHandler(this.CB_waifu2x_CheckedChanged);
-            // 
-            // groupBox4
-            // 
-            this.groupBox4.Controls.Add(this.RB_WaifuHighest);
-            this.groupBox4.Controls.Add(this.RB_WaifuHigh);
-            this.groupBox4.Controls.Add(this.RB_WaifuMed);
-            this.groupBox4.Controls.Add(this.RB_WaifuLow);
-            this.groupBox4.Location = new System.Drawing.Point(7, 167);
-            this.groupBox4.Name = "groupBox4";
-            this.groupBox4.Size = new System.Drawing.Size(251, 48);
-            this.groupBox4.TabIndex = 0;
-            this.groupBox4.TabStop = false;
-            this.groupBox4.Text = "Denoise Level";
-            // 
-            // RB_WaifuHighest
-            // 
-            this.RB_WaifuHighest.AutoSize = true;
-            this.RB_WaifuHighest.Checked = true;
-            this.RB_WaifuHighest.Location = new System.Drawing.Point(180, 20);
-            this.RB_WaifuHighest.Name = "RB_WaifuHighest";
-            this.RB_WaifuHighest.Size = new System.Drawing.Size(65, 16);
-            this.RB_WaifuHighest.TabIndex = 0;
-            this.RB_WaifuHighest.TabStop = true;
-            this.RB_WaifuHighest.Text = "Highest";
-            this.RB_WaifuHighest.UseVisualStyleBackColor = true;
-            // 
-            // RB_WaifuHigh
-            // 
-            this.RB_WaifuHigh.AutoSize = true;
-            this.RB_WaifuHigh.Location = new System.Drawing.Point(126, 20);
-            this.RB_WaifuHigh.Name = "RB_WaifuHigh";
-            this.RB_WaifuHigh.Size = new System.Drawing.Size(48, 16);
-            this.RB_WaifuHigh.TabIndex = 0;
-            this.RB_WaifuHigh.Text = "High";
-            this.RB_WaifuHigh.UseVisualStyleBackColor = true;
-            // 
-            // RB_WaifuMed
-            // 
-            this.RB_WaifuMed.AutoSize = true;
-            this.RB_WaifuMed.Location = new System.Drawing.Point(54, 20);
-            this.RB_WaifuMed.Name = "RB_WaifuMed";
-            this.RB_WaifuMed.Size = new System.Drawing.Size(69, 16);
-            this.RB_WaifuMed.TabIndex = 0;
-            this.RB_WaifuMed.Text = "Medium";
-            this.RB_WaifuMed.UseVisualStyleBackColor = true;
-            // 
-            // RB_WaifuLow
-            // 
-            this.RB_WaifuLow.AutoSize = true;
-            this.RB_WaifuLow.Location = new System.Drawing.Point(6, 20);
-            this.RB_WaifuLow.Name = "RB_WaifuLow";
-            this.RB_WaifuLow.Size = new System.Drawing.Size(47, 16);
-            this.RB_WaifuLow.TabIndex = 0;
-            this.RB_WaifuLow.Text = "Low";
-            this.RB_WaifuLow.UseVisualStyleBackColor = true;
-            // 
+            // PIC_ResultPreview
+            //
+            this.PIC_ResultPreview.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.PIC_ResultPreview.Location = new System.Drawing.Point(806, 32);
+            this.PIC_ResultPreview.Name = "PIC_ResultPreview";
+            this.PIC_ResultPreview.Size = new System.Drawing.Size(302, 302);
+            this.PIC_ResultPreview.TabIndex = 14;
+            this.PIC_ResultPreview.TabStop = false;
+            this.PIC_ResultPreview.Paint += new System.Windows.Forms.PaintEventHandler(this.PIC_ResultPreview_Paint);
+            this.PIC_ResultPreview.MouseClick += new System.Windows.Forms.MouseEventHandler(this.PIC_ResultPreview_MouseClick);
+            this.PIC_ResultPreview.MouseLeave += new System.EventHandler(this.PIC_ResultPreview_MouseLeave);
+            this.PIC_ResultPreview.MouseMove += new System.Windows.Forms.MouseEventHandler(this.PIC_ResultPreview_MouseMove);
+            //
+            // PIC_ResultZoom
+            //
+            this.PIC_ResultZoom.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.PIC_ResultZoom.Location = new System.Drawing.Point(806, 340);
+            this.PIC_ResultZoom.Name = "PIC_ResultZoom";
+            this.PIC_ResultZoom.Size = new System.Drawing.Size(302, 202);
+            this.PIC_ResultZoom.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
+            this.PIC_ResultZoom.TabIndex = 15;
+            this.PIC_ResultZoom.TabStop = false;
+            this.PIC_ResultZoom.Paint += new System.Windows.Forms.PaintEventHandler(this.PIC_ResultZoom_Paint);
+            this.PIC_ResultZoom.MouseDown += new System.Windows.Forms.MouseEventHandler(this.PIC_ResultZoom_MouseDown);
+            this.PIC_ResultZoom.MouseMove += new System.Windows.Forms.MouseEventHandler(this.PIC_ResultZoom_MouseMove);
+            this.PIC_ResultZoom.MouseUp += new System.Windows.Forms.MouseEventHandler(this.PIC_ResultZoom_MouseUp);
+            //
             // Label_FileName
-            // 
+            //
             this.Label_FileName.AutoSize = true;
             this.Label_FileName.Location = new System.Drawing.Point(13, 521);
             this.Label_FileName.Name = "Label_FileName";
@@ -1116,12 +995,13 @@
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 565);
+            this.ClientSize = new System.Drawing.Size(1120, 565);
             this.Controls.Add(this.CB_Overwrite);
             this.Controls.Add(this.CB_PdfExtract);
             this.Controls.Add(this.Label_FileName);
-            this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.BTN_ShowPreview);
+            this.Controls.Add(this.PIC_ResultPreview);
+            this.Controls.Add(this.PIC_ResultZoom);
             this.Controls.Add(this.CB_SubFolder);
             this.Controls.Add(this.Label_Progress);
             this.Controls.Add(this.PB_Progress);
@@ -1146,14 +1026,10 @@
             this.groupBox5.PerformLayout();
             this.groupBox2.ResumeLayout(false);
             this.groupBox2.PerformLayout();
-            this.groupBox3.ResumeLayout(false);
-            this.groupBox3.PerformLayout();
-            this.groupBox6.ResumeLayout(false);
-            this.groupBox6.PerformLayout();
-            this.groupBox4.ResumeLayout(false);
-            this.groupBox4.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.TB_Brightness)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.TB_Sharpen)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.PIC_ResultPreview)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.PIC_ResultZoom)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1225,24 +1101,14 @@
         private System.Windows.Forms.Label label17;
         private System.Windows.Forms.Label label16;
         private System.Windows.Forms.Button BTN_ShowPreview;
-        private System.Windows.Forms.GroupBox groupBox3;
-        private System.Windows.Forms.GroupBox groupBox4;
-        private System.Windows.Forms.RadioButton RB_WaifuHighest;
-        private System.Windows.Forms.RadioButton RB_WaifuHigh;
-        private System.Windows.Forms.RadioButton RB_WaifuMed;
-        private System.Windows.Forms.RadioButton RB_WaifuLow;
-        private System.Windows.Forms.GroupBox groupBox6;
-        private System.Windows.Forms.RadioButton RB_WaifuAnime;
-        private System.Windows.Forms.RadioButton RB_WaifuCunet;
-        private System.Windows.Forms.CheckBox CB_waifu2x;
-        private System.Windows.Forms.RadioButton RB_WaifuPhoto;
-        private System.Windows.Forms.Button BTN_waifu2x;
+        private System.Windows.Forms.Button BTN_SetPoints;
+        private System.Windows.Forms.PictureBox PIC_ResultPreview;
+        private System.Windows.Forms.PictureBox PIC_ResultZoom;
         private System.Windows.Forms.TextBox TB_AdjThreshold;
         private System.Windows.Forms.Label label14;
         private System.Windows.Forms.Label Label_FileName;
         private System.Windows.Forms.Label label19;
         private System.Windows.Forms.Label label18;
-        private System.Windows.Forms.CheckBox CB_Waifu2xTTA;
         private System.Windows.Forms.CheckBox CB_Overwrite;
         private System.Windows.Forms.CheckBox CB_PdfExtract;
         private System.Windows.Forms.GroupBox groupBox5;
