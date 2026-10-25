@@ -553,28 +553,32 @@ namespace ScannedCardDenoiser
         
         private void Execute()
         {
-            if (!Directory.Exists(TB_Target.Text))
+            // 배치는 백그라운드 스레드에서 돌아간다. 컨트롤 값은 여기서 한 번만 읽고(UI 스레드),
+            // 이후 로직은 스냅샷만 참조한다.
+            BatchSettings s = ReadBatchSettings();
+
+            if (!Directory.Exists(s.TargetPath))
             {
-                Directory.CreateDirectory(TB_Target.Text);
+                Directory.CreateDirectory(s.TargetPath);
             }
 
             bool bSelectedFiles = false;
             string[] files;
-            if (File.Exists(TB_Source.Text))
+            if (File.Exists(s.SourcePath))
             {
-                // sourceFiles는 파일 선택 다이얼로그로만 채워진다. 설정에서 경로를 복원하거나
+                // SourceFiles는 파일 선택 다이얼로그로만 채워진다. 설정에서 경로를 복원하거나
                 // 직접 입력한 경우엔 null/불일치이므로 현재 경로 단일 파일로 처리한다.
-                files = (sourceFiles != null && sourceFiles.Contains(TB_Source.Text))
-                    ? sourceFiles
-                    : new string[] { TB_Source.Text };
+                files = (s.SourceFiles != null && s.SourceFiles.Contains(s.SourcePath))
+                    ? s.SourceFiles
+                    : new string[] { s.SourcePath };
                 bSelectedFiles = true;
             }
-            else if (Directory.Exists(TB_Source.Text))
+            else if (Directory.Exists(s.SourcePath))
             {
-                if (CB_SubFolder.Checked)
-                    files = Directory.GetFiles(TB_Source.Text, "*.*", SearchOption.AllDirectories);
+                if (s.SubFolder)
+                    files = Directory.GetFiles(s.SourcePath, "*.*", SearchOption.AllDirectories);
                 else
-                    files = Directory.GetFiles(TB_Source.Text, "*.*", SearchOption.TopDirectoryOnly);
+                    files = Directory.GetFiles(s.SourcePath, "*.*", SearchOption.TopDirectoryOnly);
             }
             else
             {
@@ -584,7 +588,7 @@ namespace ScannedCardDenoiser
             // 원본 위치를 미러링해 출력 폴더(dst)를 구하는 규칙(기존 로직과 동일).
             Func<string, string> defaultDst = (filepath) =>
             {
-                string d = TB_Target.Text + filepath.Substring(TB_Source.Text.Length);
+                string d = s.TargetPath + filepath.Substring(s.SourcePath.Length);
                 if (!bSelectedFiles)
                     d = d.Remove(d.LastIndexOf('\\'));
                 return d;
@@ -598,7 +602,7 @@ namespace ScannedCardDenoiser
             {
                 if (f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!CB_PdfExtract.Checked)
+                    if (!s.PdfExtract)
                         continue; // 체크 해제 시 PDF는 처리하지 않음
 
                     string pdfDst = defaultDst(f);
@@ -619,7 +623,7 @@ namespace ScannedCardDenoiser
             Func<string, string> getDst = (filepath) =>
                 dstMap.TryGetValue(filepath, out string d) ? d : defaultDst(filepath);
 
-            if (!CB_Overwrite.Checked)
+            if (!s.Overwrite)
             {
                 List<string> newFiles = new List<string>();
                 foreach (string filepath in files)
@@ -637,12 +641,12 @@ namespace ScannedCardDenoiser
             // Manual 보정: 1단계에서 모든 파일의 코너 포인트를 순서대로 지정받아 저장하고,
             // 2단계(아래 처리 루프)에서 저장된 포인트로 디노이즈 등 파이프라인을 순차 실행한다.
             manualPointsMap = null;
-            if (RB_ManualAdjust.Checked)
+            if (s.Manual)
             {
-                bool bSizeByPixel = CB_ChangeSize.Checked && !RB_ResizePercent.Checked;
-                int desireLong = bSizeByPixel ? ParseInt(TB_ResizeW.Text) : 0;
-                int desireShort = bSizeByPixel ? ParseInt(TB_ResizeH.Text) : 0;
-                int thresholdOffset = ParseInt(TB_AdjThreshold.Text);
+                bool bSizeByPixel = s.ChangeSize && !s.ResizePercent;
+                int desireLong = bSizeByPixel ? s.ResizeW : 0;
+                int desireShort = bSizeByPixel ? s.ResizeH : 0;
+                int thresholdOffset = s.AdjThresholdOffset;
 
                 var pointsMap = new Dictionary<string, ManualQuadPoints>();
                 var confirmedFiles = new List<string>();
@@ -819,9 +823,56 @@ namespace ScannedCardDenoiser
             return cur;
         }
 
+        // 배치 실행(Execute)이 참조하는 폼 컨트롤 값 묶음.
+        // 백그라운드 스레드에서 컨트롤을 직접 읽지 않도록 진입 시 한 번에 스냅샷해 넘긴다.
+        private class BatchSettings
+        {
+            public string SourcePath;
+            public string TargetPath;
+            public string[] SourceFiles;
+            public bool SubFolder;
+            public bool PdfExtract;
+            public bool Overwrite;
+            public bool Manual;
+            public bool ChangeSize;
+            public bool ResizePercent;
+            public int ResizeW;
+            public int ResizeH;
+            public int AdjThresholdOffset;
+        }
+
+        // BuildPipelineContext와 같은 이유로 반드시 UI 스레드에서 읽는다.
+        private BatchSettings ReadBatchSettings()
+        {
+            if (InvokeRequired)
+                return (BatchSettings)Invoke(new Func<BatchSettings>(ReadBatchSettings));
+
+            return new BatchSettings
+            {
+                SourcePath = TB_Source.Text,
+                TargetPath = TB_Target.Text,
+                SourceFiles = sourceFiles,
+                SubFolder = CB_SubFolder.Checked,
+                PdfExtract = CB_PdfExtract.Checked,
+                Overwrite = CB_Overwrite.Checked,
+                Manual = RB_ManualAdjust.Checked,
+                ChangeSize = CB_ChangeSize.Checked,
+                ResizePercent = RB_ResizePercent.Checked,
+                ResizeW = ParseInt(TB_ResizeW.Text),
+                ResizeH = ParseInt(TB_ResizeH.Text),
+                AdjThresholdOffset = ParseInt(TB_AdjThreshold.Text),
+            };
+        }
+
         // Snapshot the form control values the pipeline steps need.
+        // 배치 실행(Execute)은 백그라운드 스레드에서 호출하므로 반드시 UI 스레드로 넘겨서 읽는다.
+        // TrackBar.Value 등은 컨트롤 핸들로 SendMessage를 보내기 때문에 다른 스레드에서 읽으면
+        // Control.Handle이 InvalidOperationException(잘못된 스레드 간 작업)을 던진다.
         private PipelineContext BuildPipelineContext(string filepath)
         {
+            if (InvokeRequired)
+                return (PipelineContext)Invoke(new Func<string, PipelineContext>(BuildPipelineContext), filepath);
+
             return new PipelineContext
             {
                 Form = this,
@@ -1329,7 +1380,14 @@ namespace ScannedCardDenoiser
                 Title += "[Sharpen:" + TB_Sharpen.Value + "]";
             }
 
-            Mat tmpImage = Process(TB_Source.Text);
+            if (!File.Exists(TB_Source.Text))
+            {
+                ShowWarning();
+                return;
+            }
+
+            PipelineContext ctx = BuildPipelineContext(TB_Source.Text);
+            Mat tmpImage = RunPipeline(ctx);
             if(tmpImage == null)
             {
                 ShowWarning();
@@ -1342,6 +1400,10 @@ namespace ScannedCardDenoiser
             Bitmap origBmp = null;
             {
                 PipelineContext origCtx = BuildPipelineContext(TB_Source.Text);
+                // Manual 모드에서 방금 지정한 코너 포인트를 그대로 재사용한다.
+                // (안 넘기면 LoadStep이 다이얼로그를 한 번 더 띄우고, 사용자가 다른 영역을 잡으면
+                //  비교용 원본의 기하가 결과와 어긋난다)
+                origCtx.ManualPoints = ctx.ManualPoints;
                 origCtx.Denoise = false;
                 origCtx.BrightnessEnabled = false;
                 origCtx.AutoLevel = false;

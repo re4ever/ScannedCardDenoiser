@@ -34,7 +34,12 @@ namespace ScannedCardDenoiser
                         using (CamScanForm camScanForm = new CamScanForm(ctx.FilePath, desireLong, desireShort, ctx.AdjThresholdOffset))
                         {
                             if (camScanForm.ShowDialog() == DialogResult.OK)
+                            {
+                                // 지정받은 포인트를 컨텍스트에 남겨, 같은 설정으로 다시 돌릴 때(비교용 원본 등)
+                                // 다이얼로그를 다시 띄우지 않고 그대로 재사용하게 한다.
+                                ctx.ManualPoints = camScanForm.QuadPoints;
                                 manualResult = CamScanForm.WarpQuad(camScanForm.result, camScanForm.QuadPoints);
+                            }
                             camScanForm.result?.Dispose();       // 원본은 워프 후 불필요
                             camScanForm.result = null;
                         }
